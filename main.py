@@ -6,9 +6,11 @@ from sanic_useragent import SanicUserAgent
 from sanic_compress import Compress
 from sanic.response import text, file, html, redirect
 from sanic_session import InMemorySessionInterface
+from sanic_jinja2 import SanicJinja2
 
 app = Sanic(__name__)
-session_interface = InMemorySessionInterface(expiry=600)
+jinja = SanicJinja2(app)
+session = InMemorySessionInterface(cookie_name=app.name, expiry=600, prefix=app.name)
 SanicUserAgent.init_app(app, default_locale='en_US')
 app.secret_key = os.urandom(24)
 Compress(app)
@@ -18,23 +20,23 @@ Compress(app)
 async def add_session_to_request(request):
     # before each request initialize a session
     # using the client's request
-    await session_interface.open(request)
+    await session.open(request)
 
 
 @app.middleware('response')
 async def save_session(request, response):
     # after each request save the session,
     # pass the response to set client cookies
-    await session_interface.save(request, response)
+    await session.save(request, response)
 
 
 @app.exception(NotFound)
 async def ignore_404s(request, exception):
-    return text('Yep, I totally found the page: {}'.format(request.url))
+    return jinja.render('404.html',request, pagename='404 Error', pageurl=request.url)
 
 # Define the handler functions
 async def index(request):
-    return await file('index.html')
+    return jinja.render('index.html',request)
 
 async def images(request, name):
     return await file('images/' + name)
@@ -43,7 +45,7 @@ async def styles(request):
     return await file('styles.css')
 
 async def entry(request):
-    return await file('entry.html')
+    return jinja.render('entry.html',request,pagename='Default')
 
 async def login(request):
     # Start with html5
@@ -53,7 +55,7 @@ async def login(request):
         get_password = request.form.get('password')
         if get_email == "12345" and get_password == "12345":
             request['session']['username'] = get_email
-            html_code += '<head><script>window.setTimeout(function(){ window.location = "/"; },3000);</script></head><body><h1>Thank you for logging in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
+            html_code += '<head><script defer>window.setTimeout(function(){ window.location = "/"; },3000);</script></head><body><h1>Thank you for logging in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
             # Close html5
             html_code += '</html>'
             return html(html_code)
