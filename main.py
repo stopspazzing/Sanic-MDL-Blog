@@ -47,7 +47,7 @@ async def entry(request):
 
 async def login(request):
     # Start with html5
-    html_code = '<DOCTYPE html>'
+    html_code = '<!doctype html>'
     if request.method == 'POST':
         get_email = request.form.get('email')
         get_password = request.form.get('password')
