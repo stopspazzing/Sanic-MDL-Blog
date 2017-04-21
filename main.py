@@ -32,7 +32,7 @@ async def save_session(request, response):
 
 @app.exception(NotFound)
 async def ignore_404s(request, exception):
-    return jinja.render('404.html',request, pagename='404 Error', pageurl=request.url)
+    return jinja.render('404.html', request, pagename='404 Error', pageurl=request.url)
 
 # Define the handler functions
 async def index(request):
@@ -45,11 +45,11 @@ async def styles(request):
     return await file('styles.css')
 
 async def entry(request):
-    return jinja.render('entry.html',request,pagename='Default')
+    return jinja.render('entry.html', request, pagename='Entry')
 
 async def login(request):
     # Start with html5
-    html_code = '<!doctype html>'
+    html_code = '<!DOCTYPE html>'
     if request.method == 'POST':
         get_email = request.form.get('email')
         get_password = request.form.get('password')
