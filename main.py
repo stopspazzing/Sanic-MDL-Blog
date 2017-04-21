@@ -1,4 +1,6 @@
-import asyncio
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
 import os
 from sanic import Sanic
 from sanic.exceptions import NotFound
