@@ -12,7 +12,7 @@ from sanic_jinja2 import SanicJinja2
 
 app = Sanic(__name__)
 jinja = SanicJinja2(app)
-session = InMemorySessionInterface(cookie_name=app.name, expiry=600, prefix=app.name)
+session = InMemorySessionInterface(cookie_name=app.name, prefix=app.name)
 SanicUserAgent.init_app(app, default_locale='en_US')
 app.secret_key = os.urandom(24)
 Compress(app)
@@ -46,8 +46,8 @@ async def images(request, name):
 async def styles(request):
     return await file('styles.css')
 
-async def entry(request):
-    return jinja.render('entry.html', request, pagename='Entry')
+async def post(request):
+    return jinja.render('post.html', request, postname='Default')
 
 async def login(request):
     # Start with html5
@@ -84,7 +84,7 @@ async def redirect_index(request):
 app.add_route(index, '/')
 app.add_route(images, '/images/<name>')
 app.add_route(styles, '/styles.css')
-app.add_route(entry, 'entry.html')
+app.add_route(post, 'post.html')
 app.add_route(login, '/login', methods=['GET', 'POST'])
 app.add_route(logout, '/logout')
 app.add_route(redirect_index, '/index.html')

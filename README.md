@@ -1,5 +1,5 @@
 # Sanic MDL Blog
-An asynchronous server running the blog template from Material Design Lite. Eventually will have database support to become a 'live' blog template with admin page and everything.
+An [asynchronous](http://stackoverflow.com/questions/748175/asynchronous-vs-synchronous-execution-what-does-it-really-mean) server running the [blog template](https://getmdl.io/templates/blog/) from [Material Design Lite](https://getmdl.io/) . Eventually will have database support to become a 'live' blog template with an [admin dashboard](https://getmdl.io/templates/dashboard/index.html).
 
 
 ## Installation
@@ -12,7 +12,7 @@ An asynchronous server running the blog template from Material Design Lite. Even
 ```
 NOTICE:
 
-While I have gotten this to work on Windows with Sanic 4.1, this will not run on Windows with Sanic 5+, not by choice, but because required packages for Sanic aren't supported on Windows at this time. ```
+While I have gotten this to work on Windows with Sanic 4.1, this will not run on Windows with Sanic 5+, not by choice, but because required packages for Sanic aren't supported on Windows at this time.
 ```
 
 Simple command to start server:
