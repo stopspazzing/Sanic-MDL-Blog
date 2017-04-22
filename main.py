@@ -12,7 +12,7 @@ from sanic_jinja2 import SanicJinja2
 
 app = Sanic(__name__)
 jinja = SanicJinja2(app)
-session = InMemorySessionInterface(cookie_name=app.name, prefix=app.name)
+session = InMemorySessionInterface(expiry=600)
 SanicUserAgent.init_app(app, default_locale='en_US')
 app.secret_key = os.urandom(24)
 Compress(app)
@@ -44,10 +44,20 @@ async def images(request, name):
     return await file('images/' + name)
 
 async def styles(request):
-    return await file('styles.css')
+    return await file('css/styles.css')
+
+async def admin_styles(request):
+    return await file('css/admin.css')
 
 async def post(request):
     return jinja.render('post.html', request, postname='Default')
+
+async def dashboard(request):
+    cookie_check = request.cookies.get('session')
+    if cookie_check is not None:
+        return jinja.render('admin.html', request, pagename='Dashboard')
+    else:
+        return redirect('login')
 
 async def login(request):
     # Start with html5
@@ -57,7 +67,7 @@ async def login(request):
         get_password = request.form.get('password')
         if get_email == "12345" and get_password == "12345":
             request['session']['username'] = get_email
-            html_code += '<head><script defer>window.setTimeout(function(){ window.location = "/"; },3000);</script></head><body><h1>Thank you for logging in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
+            html_code += '<head><script defer>window.setTimeout(function(){ window.location = "admin"; },3000);</script></head><body><h1>Thank you for logging in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
             # Close html5
             html_code += '</html>'
             return html(html_code)
@@ -69,7 +79,7 @@ async def login(request):
         # Add <body>
         html_code += '</head><body><h1>Restricted Area - Login Required</h1><br/><form role="form" novalidate method="POST"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="email" id="user" name="email"><label class="mdl-textfield__label" for="user">Email address</label></div><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="password" id="password" name="password"><label class="mdl-textfield__label" for="password">Password</label></div><button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored">Login</button></form></body>'
     else:
-        html_code += '<script>window.setTimeout(function(){ window.location = "/"; },3000);</script></head><body><h1>You\'re already logged in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
+        html_code += '<script defer>window.setTimeout(function(){ window.location = "/"; },3000);</script></head><body><h1>You\'re already logged in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
     # Close html5
     html_code += '</html>'
     return html(html_code)
@@ -82,11 +92,13 @@ async def redirect_index(request):
 
 # Add each handler function as a route
 app.add_route(index, '/')
-app.add_route(images, '/images/<name>')
-app.add_route(styles, '/styles.css')
+app.add_route(images, 'images/<name>')
+app.add_route(styles, 'styles.css')
+app.add_route(admin_styles, 'admin.css')
 app.add_route(post, 'post.html')
-app.add_route(login, '/login', methods=['GET', 'POST'])
-app.add_route(logout, '/logout')
+app.add_route(dashboard, 'admin')
+app.add_route(login, 'login', methods=['GET', 'POST'])
+app.add_route(logout, 'logout')
 app.add_route(redirect_index, '/index.html')
 
 if __name__ == '__main__':

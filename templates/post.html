@@ -130,5 +130,16 @@
 {% endblock %}
 
 {% block js_body_end %}
+
+{% if js_custom %}
+{% for js in js_custom %}
+<script src="{{ js_custom }}"></script>
+{% endfor %}
+
+{% else %}
 <script src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+{% endif %}
+
 {% endblock %}
+
+

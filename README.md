@@ -16,6 +16,6 @@ While I have gotten this to work on Windows with Sanic 4.1, this will not run on
 ```
 
 Simple command to start server:
-`python3 main.py`
+`python main.py`
 
 To access server: http://127.0.0.1:8000
