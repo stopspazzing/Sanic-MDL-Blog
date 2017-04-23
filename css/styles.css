@@ -342,7 +342,7 @@ body .demo-blog {
 
 /* Fixes for IE 10 */
 .mdl-grid {
-  display: flex !important;
+  display: flex/* !important*/;
 }
 
 .social-btn {
