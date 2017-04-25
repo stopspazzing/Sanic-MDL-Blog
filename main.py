@@ -6,16 +6,16 @@ from sanic import Sanic
 from sanic.exceptions import NotFound
 from sanic_useragent import SanicUserAgent
 from sanic_compress import Compress
-from sanic.response import text, file, html, redirect
+from sanic.response import file, html, redirect
 from sanic_session import InMemorySessionInterface
 from sanic_jinja2 import SanicJinja2
 
 app = Sanic(__name__)
-jinja = SanicJinja2(app)
 session = InMemorySessionInterface(expiry=600)
 SanicUserAgent.init_app(app, default_locale='en_US')
 app.secret_key = os.urandom(24)
 Compress(app)
+jinja = SanicJinja2(app)
 
 
 @app.middleware('request')
@@ -38,7 +38,7 @@ async def ignore_404s(request, exception):
 
 # Define the handler functions
 async def index(request):
-    return jinja.render('index.html',request)
+    return jinja.render('index.html', request)
 
 async def images(request, name):
     return await file('images/' + name)
