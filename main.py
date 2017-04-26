@@ -21,7 +21,7 @@ jinja = SanicJinja2(app)
 @app.middleware('request')
 async def add_session_to_request(request):
     # before each request initialize a session
-    # using the client's request
+    # using the client's request session.session_store
     await session.open(request)
 
 
@@ -34,7 +34,7 @@ async def save_session(request, response):
 
 @app.exception(NotFound)
 async def ignore_404s(request, exception):
-    return jinja.render('404.html', request, pagename='404 Error', pageurl=request.url)
+    return jinja.render('page.html', request, pagename='404 Error', pageheader='404 Error - Page Not Found', pagetext='We Can\'t Seem To Find' + request.url)
 
 # Define the handler functions
 async def index(request):
@@ -76,8 +76,9 @@ async def login(request):
     html_code += '<head><link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"><link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css"><script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>'
     # Is cookie set?
     if cookie_check is None:
-        # Add <body>
-        html_code += '</head><body><h1>Restricted Area - Login Required</h1><br/><form role="form" novalidate method="POST"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="email" id="user" name="email"><label class="mdl-textfield__label" for="user">Email address</label></div><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="password" id="password" name="password"><label class="mdl-textfield__label" for="password">Password</label></div><button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored">Login</button></form></body>'
+        # Render generic post and insert login form
+        return jinja.render('page.html', request, pageheader='Restricted Area - Login Required', pagetext='<form role="form" novalidate method="POST"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="email" id="user" name="email"><label class="mdl-textfield__label" for="user">Email address</label></div><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="password" id="password" name="password"><label class="mdl-textfield__label" for="password">Password</label></div><button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored">Login</button></form>')
+        # html_code += '</head><body><h1>Restricted Area - Login Required</h1><br/></body>'
     else:
         html_code += '<script defer>window.setTimeout(function(){ window.location = "/"; },3000);</script></head><body><h1>You\'re already logged in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
     # Close html5

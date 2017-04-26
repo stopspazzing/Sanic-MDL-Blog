@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ pagename }} Page - Entry{% endblock %}
+{% block title %}{{ pagename }} Page {% endblock %}
 
 {% block body %}
 <div class="demo-blog demo-blog--blogpost mdl-layout mdl-js-layout has-drawer is-upgraded">
@@ -13,11 +13,11 @@
         <div class="demo-blog__posts mdl-grid">
           <div class="mdl-card mdl-shadow--4dp mdl-cell mdl-cell--12-col">
             <div class="mdl-card__media mdl-color-text--grey-50">
-              <h3>404 Error - Page Not Found</h3>
+              <h3>{{ pageheader }}</h3>
             </div>
             <div class="mdl-color-text--grey-700 mdl-card__supporting-text">
               <p>
-                We Can't Seem To Find {{ pageurl }}!
+                {{ pagetext }}
               </p>
             </div>
           </div>
