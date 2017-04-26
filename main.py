@@ -60,30 +60,28 @@ async def dashboard(request):
         return redirect('login')
 
 async def login(request):
-    # Start with html5
-    html_code = '<!DOCTYPE html>'
+    page = dict()
     if request.method == 'POST':
         get_email = request.form.get('email')
         get_password = request.form.get('password')
         if get_email == "12345" and get_password == "12345":
             request['session']['username'] = get_email
-            html_code += '<head><script defer>window.setTimeout(function(){ window.location = "admin"; },3000);</script></head><body><h1>Thank you for logging in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
-            # Close html5
-            html_code += '</html>'
-            return html(html_code)
+            page['title'] = 'Login'
+            page['header'] = 'Thank you for logging in!'
+            page['text'] = 'Redirecting in 3 seconds...'
+            return jinja.render('page.html', request, page=page, js_head_end='<script defer>window.setTimeout(function(){ window.location = "admin"; },3000);</script>')
     cookie_check = request.cookies.get('session')
-    # Add <head>
-    html_code += '<head><link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons"><link rel="stylesheet" href="https://code.getmdl.io/1.3.0/material.indigo-pink.min.css"><script defer src="https://code.getmdl.io/1.3.0/material.min.js"></script>'
     # Is cookie set?
     if cookie_check is None:
+        page['title'] = 'Login'
+        page['header'] = 'Restricted Area - Login Required'
+        page['text'] = '<form role="form" novalidate method="POST"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="email" id="user" name="email"><label class="mdl-textfield__label" for="user">Email address</label></div><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="password" id="password" name="password"><label class="mdl-textfield__label" for="password">Password</label></div><button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored">Login</button></form>'
         # Render generic post and insert login form
-        return jinja.render('page.html', request, pageheader='Restricted Area - Login Required', pagetext='<form role="form" novalidate method="POST"><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="email" id="user" name="email"><label class="mdl-textfield__label" for="user">Email address</label></div><div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label"><input class="mdl-textfield__input" type="password" id="password" name="password"><label class="mdl-textfield__label" for="password">Password</label></div><button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored">Login</button></form>')
-        # html_code += '</head><body><h1>Restricted Area - Login Required</h1><br/></body>'
-    else:
-        html_code += '<script defer>window.setTimeout(function(){ window.location = "/"; },3000);</script></head><body><h1>You\'re already logged in!</h1><br/><h2>Redirecting in 3 seconds...</h2></body>'
-    # Close html5
-    html_code += '</html>'
-    return html(html_code)
+        return jinja.render('page.html', request, page=page)
+    page['title'] = 'Login'
+    page['header'] = 'You\'re already logged in!'
+    page['text'] = 'Redirecting in 3 seconds...'
+    return jinja.render('page.html', request, page=page, js_head_end='<script defer>window.setTimeout(function(){ window.location = "/"; },3000);</script>')
 
 async def logout(request):
     return html('<h1>Logging out %s</h1>' % request['session'])
