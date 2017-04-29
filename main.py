@@ -9,13 +9,19 @@ from sanic_compress import Compress
 from sanic.response import file, html, redirect
 from sanic_session import InMemorySessionInterface
 from sanic_jinja2 import SanicJinja2
+from sanic_wtf import SanicWTF
+from wtforms import StringField, SubmitField, PasswordField, FormField, TextField
+from wtforms.validators import DataRequired, Length
+
 
 app = Sanic(__name__)
+jinja = SanicJinja2(app)
+Compress(app)
 session = InMemorySessionInterface(expiry=600)
 SanicUserAgent.init_app(app, default_locale='en_US')
-app.secret_key = os.urandom(24)
-Compress(app)
-jinja = SanicJinja2(app)
+app.config['SECRET_KEY'] = os.urandom(24)
+
+# TODO: Add DB info
 
 
 @app.middleware('request')
@@ -36,6 +42,13 @@ async def ignore_404s(request, exception):
     page['text'] = 'We Can\'t Seem To Find ' + request.url
     return jinja.render('page.html', request, page=page)
 
+wtf = SanicWTF(app)
+
+
+class LoginForm(wtf.Form):
+    username = StringField('Username', validators=[DataRequired(), Length(min=3)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=3)])
+    submit = SubmitField('Sign In')
 
 async def index(request):
     return jinja.render('index.html', request)
@@ -54,6 +67,7 @@ async def admin_styles(request):
 
 
 async def post(request):
+    # TODO: pull values for post from db and add values to post dict
     return jinja.render('post.html', request, postname='Default')
 
 
@@ -67,29 +81,22 @@ async def dashboard(request):
 
 async def login(request):
     page = dict()
-    if request.method == 'POST':
-        get_email = request.form.get('email')
-        get_password = request.form.get('password')
-        if get_email == "12345@12345.com" and get_password == "12345":
-            request['session']['username'] = get_email
+    form = LoginForm(request.form)
+    if request.method == 'POST' and form.validate():
+        get_username = form.username.data
+        get_password = form.password.data
+        if get_username == "12345" and get_password == "12345":
+            request['session']['username'] = get_username
             page['title'] = 'Login'
             page['header'] = 'Thank you for logging in!'
             page['text'] = 'Redirecting in 3 seconds...'
             return jinja.render('page.html', request, page=page,
                                 js_head_end='<script defer>window.setTimeout(function(){ window.location = "admin"; },3000);</script>')
-    cookie_check = request.cookies.get('session')
-    if cookie_check is None:
+    login_check = request['session'].get('username')
+    if login_check is None:
         page['title'] = 'Login'
         page['header'] = 'Restricted Area - Login Required'
-        page['text'] = '<form role="form" method="POST">' \
-                       '<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">' \
-                       '<input class="mdl-textfield__input" type="email" id="user" name="email">' \
-                       '<label class="mdl-textfield__label" for="user">Email address</label></div>' \
-                       '<div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">' \
-                       '<input class="mdl-textfield__input" type="password" id="password" name="password">' \
-                       '<label class="mdl-textfield__label" for="password">Password</label></div>' \
-                       '<button type="submit" class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored">Login</button></form>'
-        return jinja.render('page.html', request, page=page)
+        return jinja.render('page.html', request, page=page, form=form)
     page['title'] = 'Login'
     page['header'] = 'You\'re already logged in!'
     page['text'] = 'Redirecting in 3 seconds...'
@@ -98,12 +105,12 @@ async def login(request):
 
 
 async def logout(request):
-    return html('<h1>Logging out %s</h1>' % request['session'])
+    usr = request['session'].get('username')
+    return html(f'<h1>Logging out {usr}</h1>')
 
 
 async def redirect_index(request):
     return redirect('/')
-
 
 app.add_route(index, '/')
 app.add_route(images, 'images/<name>')

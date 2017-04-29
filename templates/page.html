@@ -17,7 +17,30 @@
             </div>
             <div class="mdl-color-text--grey-700 mdl-card__supporting-text">
               <p>
-                {{ page.text }}
+                  {% if not form %}
+                    {{ page.text }}
+                  {% else %}
+                    <form role="form" method="POST">
+                        {{form.hidden_tag}}
+                        <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                            {{ form.username(class="mdl-textfield__input is-invalid") }}
+                            {{ form.username.label(class="mdl-textfield__label") }}
+                            <span class="mdl-textfield__error">
+                                {% for errors in form.username.errors %}
+                                    {{ errors }}
+                                {% endfor %}
+                            </span>
+                        </div>
+                        <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
+                            {{ form.password(class="mdl-textfield__input") }}
+                            {{ form.password.label(class="mdl-textfield__label") }}
+                            {% for errors in form.password.errors %}
+                                {{ errors }}
+                            {% endfor %}
+                        </div>
+                            {{ form.submit(class="mdl-button mdl-js-button mdl-button--raised mdl-button--colored") }}
+                    </form>
+                  {% endif %}
               </p>
             </div>
           </div>
