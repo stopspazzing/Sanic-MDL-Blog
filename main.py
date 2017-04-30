@@ -91,21 +91,26 @@ async def login(request):
             page['header'] = 'Thank you for logging in!'
             page['text'] = 'Redirecting in 3 seconds...'
             return jinja.render('page.html', request, page=page,
-                                js_head_end='<script defer>window.setTimeout(function(){ window.location = "admin"; },3000);</script>')
+                                js_head_end='<script defer>window.setTimeout(function(){ window.location = "admin"; }'
+                                            ',3000);</script>')
     login_check = request['session'].get('username')
     if login_check is None:
         page['title'] = 'Login'
         page['header'] = 'Restricted Area - Login Required'
-        return jinja.render('page.html', request, page=page, form=form)
+        return jinja.render('page.html', request, page=page, form=form,
+                            css_head_end='<style>.mdl-layout{align-items: center;justify-content: center;}'
+                                         '.mdl-layout__content {padding: 24px;flex: none;}</style>')
     page['title'] = 'Login'
     page['header'] = 'You\'re already logged in!'
     page['text'] = 'Redirecting in 3 seconds...'
     return jinja.render('page.html', request, page=page,
-                        js_head_end='<script defer>window.setTimeout(function(){ window.location = "/"; },3000);</script>')
+                        js_head_end='<script defer>window.setTimeout(function(){ window.location = "/"; },3000);'
+                                    '</script>')
 
 
 async def logout(request):
     usr = request['session'].get('username')
+    del request['session']
     return html(f'<h1>Logging out {usr}</h1>')
 
 
