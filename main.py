@@ -72,21 +72,21 @@ async def post(request):
 
 
 async def dashboard(request):
-    cookie_check = request.cookies.get('session')
-    if cookie_check is not None:
-        return jinja.render('admin.html', request, pagename='Dashboard')
-    else:
+    cookie_check = request['session'].get('username')
+    if cookie_check is None:
         return redirect('login')
+    return jinja.render('admin.html', request, pagename='Dashboard')
 
 
 async def login(request):
     page = dict()
     form = LoginForm(request.form)
     if request.method == 'POST' and form.validate():
-        get_username = form.username.data
-        get_password = form.password.data
-        if get_username == "12345" and get_password == "12345":
-            request['session']['username'] = get_username
+        get_user = form.username.data
+        get_pass = form.password.data
+        # TODO: Get username and password from db to verify against
+        if get_user == "12345" and get_pass == "12345":
+            request['session']['username'] = get_user
             page['title'] = 'Login'
             page['header'] = 'Thank you for logging in!'
             page['text'] = 'Redirecting in 3 seconds...'
@@ -104,14 +104,19 @@ async def login(request):
     page['header'] = 'You\'re already logged in!'
     page['text'] = 'Redirecting in 3 seconds...'
     return jinja.render('page.html', request, page=page,
-                        js_head_end='<script defer>window.setTimeout(function(){ window.location = "/"; },3000);'
+                        js_head_end='<script defer>window.setTimeout(function(){ window.location = "admin"; },3000);'
                                     '</script>')
 
 
 async def logout(request):
-    usr = request['session'].get('username')
-    del request['session']
-    return html(f'<h1>Logging out {usr}</h1>')
+    page = dict()
+    del request['session']['username']
+    page['title'] = 'Logging Out'
+    page['header'] = 'You have been successfully logged out'
+    page['text'] = 'Redirecting in 3 seconds...'
+    return jinja.render('page.html', request, page=page,
+                        js_head_end='<script defer>window.setTimeout(function(){ window.location = "/"; }'
+                                    ',3000);</script>')
 
 
 async def redirect_index(request):
