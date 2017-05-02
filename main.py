@@ -6,13 +6,12 @@ from sanic import Sanic
 from sanic.exceptions import NotFound
 from sanic_useragent import SanicUserAgent
 from sanic_compress import Compress
-from sanic.response import file, html, redirect
+from sanic.response import file, redirect
 from sanic_session import InMemorySessionInterface
 from sanic_jinja2 import SanicJinja2
 from sanic_wtf import SanicWTF
-from wtforms import StringField, SubmitField, PasswordField, FormField, TextField
-from wtforms.validators import DataRequired, Length
-
+from wtforms import StringField, SubmitField, PasswordField
+from wtforms.validators import DataRequired
 
 app = Sanic(__name__)
 jinja = SanicJinja2(app)
@@ -20,6 +19,7 @@ Compress(app)
 session = InMemorySessionInterface(expiry=600)
 SanicUserAgent.init_app(app, default_locale='en_US')
 app.config['SECRET_KEY'] = os.urandom(24)
+
 
 # TODO: Add DB info
 
@@ -42,13 +42,15 @@ async def ignore_404s(request, exception):
     page['text'] = 'We Can\'t Seem To Find ' + request.url
     return jinja.render('page.html', request, page=page)
 
+
 wtf = SanicWTF(app)
 
 
 class LoginForm(wtf.Form):
-    username = StringField('Username', validators=[DataRequired(), Length(min=3)])
-    password = PasswordField('Password', validators=[DataRequired(), Length(min=3)])
+    username = StringField('Username', validators=[DataRequired()])
+    password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Sign In')
+
 
 async def index(request):
     return jinja.render('index.html', request)
@@ -121,6 +123,7 @@ async def logout(request):
 
 async def redirect_index(request):
     return redirect('/')
+
 
 app.add_route(index, '/')
 app.add_route(images, 'images/<name>')

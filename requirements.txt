@@ -4,3 +4,4 @@ sanic_session
 sanic-jinja2
 sanic_compress
 sanic-useragent
+wtforms
