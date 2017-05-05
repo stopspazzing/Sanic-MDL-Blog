@@ -2,15 +2,16 @@
 # -*- coding: utf-8 -*-
 
 import os
-import sqlite3
+
+import aioodbc
 from sanic import Sanic
 from sanic.exceptions import NotFound
-from sanic_useragent import SanicUserAgent
-from sanic_compress import Compress
 from sanic.response import file, redirect
-from sanic_session import InMemorySessionInterface
+from sanic_compress import Compress
 from sanic_jinja2 import SanicJinja2
-from sanic_wtf import SanicWTF
+from sanic_session import InMemorySessionInterface
+from sanic_useragent import SanicUserAgent
+from sanic_wtf import SanicForm
 from wtforms import StringField, SubmitField, PasswordField
 from wtforms.validators import DataRequired
 
@@ -24,21 +25,15 @@ SanicUserAgent.init_app(app, default_locale='en_US')
 @app.listener('before_server_start')
 async def setup_cfg(app, loop):
     app.config['SECRET_KEY'] = os.urandom(24)
-    app.config['DATABASE'] = 'database.db'
     app.config['DEMO_CONTENT'] = True
+    app.config['DATABASE'] = 'Driver=SQLite;Database=data.db'
     try:
         cfg = app.config.from_pyfile('config.cfg')
         if cfg is None:
             app.config.from_envvar('config_file')
     except FileNotFoundError:
         print('Error - Config Not Found')
-    app.db = sqlite3.connect(app.config['DATABASE'])
-    app.db.execute(
-        '''CREATE TABLE IF NOT EXISTS blog_data(ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL default 'None', post_author UNSIGNED BIG INT(20) NOT NULL default '0', post_date DATETIME NOT NULL default '0000-00-00 00-00-00', post_content TEXT NOT NULL default 'None', post_title TEXT NOT NULL default 'None', post_excerpt TEXT NOT NULL default 'None', post_status VARCHAR(20) NOT NULL default 'publish', post_modified DATETIME NOT NULL, comment_status VARCHAR(20) NOT NULL default 'open', post_password VARCHAR(20) NOT NULL, post_name VARCHAR(200) NOT NULL, post_likes VARCHAR(20) NOT NULL)''')
-    if app.config['DEMO_CONTENT']:
-        app.db.execute(
-            '''CREATE TABLE IF NOT EXISTS blog_demo(ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL default 'None', post_author VARCHAR(20) NOT NULL default 'demo', post_date DATETIME NOT NULL default '0000-00-00 00-00-00', post_content TEXT NOT NULL default 'None', post_title TEXT NOT NULL default 'None', post_excerpt TEXT NOT NULL default 'None', post_status VARCHAR(20) NOT NULL default 'publish', post_modified DATETIME NOT NULL default '0000-00-00 00-00-00', comment_status VARCHAR(20) NOT NULL default 'open', post_password VARCHAR(20) NOT NULL default 'None', post_name VARCHAR(200) NOT NULL default 'new post', post_likes VARCHAR(20) default '0')''')
-        #app.db.cursor().execute('''INSERT INTO blog_demo (post_author,post_date,post_content,post_title,post_excerpt,post_name,post_likes) VALUES ('demo','2017-05-02 14:38:12.228329','this is test content filler for your enjoyment','test','this is test content filler...','test','2');''')
+    await db_setup()
 
 
 @app.listener('after_server_start')
@@ -53,7 +48,8 @@ async def notify_server_stopping(app, loop):
 
 @app.listener('after_server_stop')
 async def close_db(app, loop):
-    app.db.close()
+    conn = await db_connection()
+    await conn.close()
 
 
 @app.middleware('request')
@@ -74,13 +70,35 @@ async def ignore_404s(request, exception):
     page['text'] = 'We Can\'t Seem To Find ' + request.url
     return jinja.render('page.html', request, page=page)
 
-wtf = SanicWTF(app)
 
-
-class LoginForm(wtf.Form):
+class LoginForm(SanicForm):
     username = StringField('Username', validators=[DataRequired()])
     password = PasswordField('Password', validators=[DataRequired()])
     submit = SubmitField('Sign In')
+
+
+async def db_connection():
+    if app.config['DATABASE']:
+        dsn = app.config['DATABASE']  # needs to be the actual config for dsn pulled from config db
+    else:
+        dsn = 'Driver=SQLite;Database=data.db'
+    return await aioodbc.connect(dsn=dsn, loop=app.loop)
+
+
+async def db_setup():
+    conn = await db_connection()
+    cur = await conn.cursor()
+    await cur.execute('CREATE TABLE blog_data (ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL default \'None\', post_author UNSIGNED BIG INT(20) NOT NULL default \'0\', post_date DATETIME NOT NULL default \'0000-00-00 00-00-00\', post_content TEXT NOT NULL default \'None\', post_title TEXT NOT NULL default \'None\', post_excerpt TEXT NOT NULL default \'None\', post_status VARCHAR(20) NOT NULL default \'publish\', post_modified DATETIME NOT NULL, comment_status VARCHAR(20) NOT NULL default \'open\', post_password VARCHAR(20) NOT NULL, post_name VARCHAR(200) NOT NULL, post_likes VARCHAR(20) NOT NULL)')
+    if app.config['DEMO_CONTENT']:
+        await cur.execute('CREATE TABLE blog_demo (ID INTEGER NOT NULL DEFAULT \'None\' PRIMARY KEY AUTOINCREMENT, post_author VARCHAR(20) NOT NULL DEFAULT \'demo\', post_date DATETIME NOT NULL DEFAULT \'0000-00-00 00-00-00\', post_content TEXT NOT NULL DEFAULT \'None\', post_title TEXT NOT NULL DEFAULT \'None\', post_name VARCHAR(200) NOT NULL DEFAULT \'new post\', post_excerpt TEXT NOT NULL DEFAULT \'None\', post_image VARCHAR(20) DEFAULT \'road_big.jpg\', post_status VARCHAR(20) NOT NULL DEFAULT \'publish\', post_modified DATETIME NOT NULL DEFAULT \'0000-00-00 00-00-00\', comment_status VARCHAR(20) NOT NULL DEFAULT \'open\', post_password VARCHAR(20) NOT NULL DEFAULT \'None\', post_likes VARCHAR(20) NOT NULL DEFAULT \'0\' )')
+    data = await cur.fetchone()
+    if data is None:
+        print('this db is empty yo')
+    else:
+        print('this db isn\'t empty bro')
+    await cur.close()
+    await conn.close()
+
 
 async def index(request):
     # TODO: Need to pull posts and their excerpts then order them by date
@@ -113,7 +131,7 @@ async def dashboard(request):
 
 async def login(request):
     page = dict()
-    form = LoginForm(request.form)
+    form = LoginForm(request)
     if request.method == 'POST' and form.validate():
         get_user = form.username.data
         get_pass = form.password.data
@@ -152,9 +170,20 @@ async def logout(request):
                                     ',3000);</script>')
 
 
+async def test(request):
+    conn = await db_connection()
+    cur = await conn.cursor()
+    data = await cur.execute('SELECT * FROM blog_demo ORDER BY ID;')
+    for d in data:
+        print(d)
+    await cur.close()
+    await conn.close()
+
+
 async def redirect_index(request):
     return redirect('/')
 
+app.add_route(test, 'test')
 app.add_route(index, '/')
 app.add_route(images, 'images/<name>')
 app.add_route(styles, 'styles.css')
