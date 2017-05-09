@@ -26,7 +26,7 @@ SanicUserAgent.init_app(app, default_locale='en_US')
 async def setup_cfg(app, loop):
     app.config['SECRET_KEY'] = os.urandom(24)
     app.config['DEMO_CONTENT'] = True
-    app.config['DATABASE'] = 'Driver=SQLite;Database=data.db'
+    app.config['DATABASE'] = 'Driver=SQLite3;Database=sqlite.db'
     try:
         cfg = app.config.from_pyfile('config.cfg')
         if cfg is None:
@@ -46,10 +46,10 @@ async def notify_server_stopping(app, loop):
     print('Server shutting down!')
 
 
-@app.listener('after_server_stop')
-async def close_db(app, loop):
-    conn = await db_connection()
-    await conn.close()
+# @app.listener('after_server_stop')
+# async def close_db(app, loop):
+    # con = await db_connection()
+    # await con.close()
 
 
 @app.middleware('request')
@@ -79,25 +79,48 @@ class LoginForm(SanicForm):
 
 async def db_connection():
     if app.config['DATABASE']:
-        dsn = app.config['DATABASE']  # needs to be the actual config for dsn pulled from config db
+        dsn = app.config['DATABASE']
     else:
-        dsn = 'Driver=SQLite;Database=data.db'
+        dsn = 'Driver=SQLite3;Database=data.db'
     return await aioodbc.connect(dsn=dsn, loop=app.loop)
 
 
 async def db_setup():
-    conn = await db_connection()
-    cur = await conn.cursor()
-    await cur.execute('CREATE TABLE blog_data (ID INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL default \'None\', post_author UNSIGNED BIG INT(20) NOT NULL default \'0\', post_date DATETIME NOT NULL default \'0000-00-00 00-00-00\', post_content TEXT NOT NULL default \'None\', post_title TEXT NOT NULL default \'None\', post_excerpt TEXT NOT NULL default \'None\', post_status VARCHAR(20) NOT NULL default \'publish\', post_modified DATETIME NOT NULL, comment_status VARCHAR(20) NOT NULL default \'open\', post_password VARCHAR(20) NOT NULL, post_name VARCHAR(200) NOT NULL, post_likes VARCHAR(20) NOT NULL)')
+    con = await db_connection()
+    await con.execute('CREATE TABLE blog_data ('
+                      'Id INTEGER PRIMARY KEY AUTOINCREMENT,'
+                      'post_author UNSIGNED BIG INT(20) default "0",'
+                      'post_date DATETIME default "0000-00-00 00-00-00",'
+                      'post_content TEXT default "None",'
+                      'post_title TEXT default "None",'
+                      'post_excerpt TEXT default "None",'
+                      'post_status VARCHAR(20) default "publish",'
+                      'post_modified DATETIME NOT NULL,'
+                      'comment_status VARCHAR(20) default "open",'
+                      'post_password VARCHAR(20) NOT NULL,'
+                      'post_name VARCHAR(200) NOT NULL,'
+                      'post_likes VARCHAR(20) NOT NULL);')
     if app.config['DEMO_CONTENT']:
-        await cur.execute('CREATE TABLE blog_demo (ID INTEGER NOT NULL DEFAULT \'None\' PRIMARY KEY AUTOINCREMENT, post_author VARCHAR(20) NOT NULL DEFAULT \'demo\', post_date DATETIME NOT NULL DEFAULT \'0000-00-00 00-00-00\', post_content TEXT NOT NULL DEFAULT \'None\', post_title TEXT NOT NULL DEFAULT \'None\', post_name VARCHAR(200) NOT NULL DEFAULT \'new post\', post_excerpt TEXT NOT NULL DEFAULT \'None\', post_image VARCHAR(20) DEFAULT \'road_big.jpg\', post_status VARCHAR(20) NOT NULL DEFAULT \'publish\', post_modified DATETIME NOT NULL DEFAULT \'0000-00-00 00-00-00\', comment_status VARCHAR(20) NOT NULL DEFAULT \'open\', post_password VARCHAR(20) NOT NULL DEFAULT \'None\', post_likes VARCHAR(20) NOT NULL DEFAULT \'0\' )')
-    data = await cur.fetchone()
+        await con.execute('CREATE TABLE blog_demo ('
+                          'Id INTEGER PRIMARY KEY AUTOINCREMENT,'
+                          'post_author VARCHAR(20) DEFAULT "demo",'
+                          'post_date DATETIME DEFAULT "0000-00-00 00-00-00",'
+                          'post_content TEXT DEFAULT "None",'
+                          'post_title TEXT DEFAULT "None",'
+                          'post_name VARCHAR(200) DEFAULT "new post",'
+                          'post_excerpt TEXT DEFAULT "None",'
+                          'post_image VARCHAR(20) DEFAULT "road_big.jpg",'
+                          'post_status VARCHAR(20) DEFAULT "publish",'
+                          'post_modified DATETIME DEFAULT "0000-00-00 00-00-00",'
+                          'comment_status VARCHAR(20) DEFAULT "open",'
+                          'post_password VARCHAR(20) DEFAULT "None",'
+                          'post_likes VARCHAR(20) DEFAULT "0" );')
+    data = await con.execute('select * from blog_demo')
     if data is None:
         print('this db is empty yo')
     else:
         print('this db isn\'t empty bro')
-    await cur.close()
-    await conn.close()
+    await con.close()
 
 
 async def index(request):
@@ -135,8 +158,10 @@ async def login(request):
     if request.method == 'POST' and form.validate():
         get_user = form.username.data
         get_pass = form.password.data
+        print("this was a post")
         # TODO: Get username and password from db to verify against
         if get_user == "12345" and get_pass == "12345":
+            print('valid information')
             request['session']['username'] = get_user
             page['title'] = 'Login'
             page['header'] = 'Thank you for logging in!'
@@ -171,13 +196,11 @@ async def logout(request):
 
 
 async def test(request):
-    conn = await db_connection()
-    cur = await conn.cursor()
-    data = await cur.execute('SELECT * FROM blog_demo ORDER BY ID;')
+    con = await db_connection()
+    data = await con.execute('SELECT * FROM blog_demo ORDER BY ID;')
     for d in data:
         print(d)
-    await cur.close()
-    await conn.close()
+    await con.close()
 
 
 async def redirect_index(request):

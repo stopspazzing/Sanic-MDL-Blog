@@ -5,3 +5,5 @@ sanic-jinja2
 sanic_compress
 sanic-useragent
 wtforms
+sanic_wtf >= 0.4.0
+aioodbc
