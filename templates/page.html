@@ -36,6 +36,7 @@
 
                 <div class="mdl-card__supporting-text">
                     <form role="form" method="POST">
+                        {{ form.csrf_token }}
                         {{ login_error }}
                         <div class="mdl-textfield mdl-js-textfield">
                             {{ form.username(class="mdl-textfield__input") }}

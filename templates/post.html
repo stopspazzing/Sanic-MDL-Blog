@@ -40,7 +40,7 @@
                 {{ post.content }}
               </p>
             </div>
-            {% if comment_status == "open" %}
+            {% if post.comments == "open" %}
             <div class="mdl-color-text--primary-contrast mdl-card__supporting-text comments">
               <form>
                 <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
