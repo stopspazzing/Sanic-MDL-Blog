@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 
-{% block title %}{{ post.title }}{% endblock %}
+{% block title %}{{ post.post_title }}{% endblock %}
 
 {% block body %}
 <div class="demo-blog demo-blog--blogpost mdl-layout mdl-js-layout has-drawer is-upgraded">
@@ -12,18 +12,23 @@
         </div>
         <div class="demo-blog__posts mdl-grid">
           <div class="mdl-card mdl-shadow--4dp mdl-cell mdl-cell--12-col">
-            <div class="mdl-card__media mdl-color-text--grey-50">
-              <h3>{{ post.title }}</h3>
+            <div class="mdl-card__media mdl-color-text--grey-50" style="background-image: url(images/{{post.post_image}})">
+              <h3>{{ post.post_title }}</h3>
             </div>
             <div class="mdl-color-text--grey-700 mdl-card__supporting-text meta">
               <div class="minilogo"></div>
               <div>
-                <strong>{{ post.author }}</strong>
-                <span>{{ post.date }}</span>
+                <strong>{{ post.post_author }}</strong>
+                <span>{% if post.post_date == None %}
+                        A long time ago
+                      {% else %}
+                        {{ post.post_date }}
+                      {% endif %}
+                </span>
               </div>
               <div class="section-spacer"></div>
               <div class="meta__favorites">
-                {{ post.likes }} <i class="material-icons" role="presentation">favorite</i>
+                {{ post.post_likes }} <i class="material-icons" role="presentation">favorite</i>
                 <span class="visuallyhidden">favorites</span>
               </div>
               <div>
@@ -37,10 +42,10 @@
             </div>
             <div class="mdl-color-text--grey-700 mdl-card__supporting-text">
               <p>
-                {{ post.content }}
+                {{ post.post_content }}
               </p>
             </div>
-            {% if post.comments == "open" %}
+            {% if post.comment_status == "open" %}
             <div class="mdl-color-text--primary-contrast mdl-card__supporting-text comments">
               <form>
                 <div class="mdl-textfield mdl-js-textfield mdl-textfield--floating-label">
