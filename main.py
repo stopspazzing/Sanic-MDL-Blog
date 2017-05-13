@@ -24,34 +24,31 @@ SanicUserAgent.init_app(app, default_locale='en_US')
 
 @app.listener('before_server_start')
 async def setup_cfg(app, loop):
-    app.config['SECRET_KEY'] = os.urandom(24)
-    app.config['DEMO_CONTENT'] = True
-    app.config['DATABASE'] = 'Driver=SQLite3;Database=sqlite.db'
-    app.config['DATABASE_TYPE'] = 'sql'
-    app.config['SETUP_DB'] = True
     try:
-        cfg = app.config.from_pyfile('config.cfg')
+        cfg = app.config.from_pyfile('config.py')
         if cfg is None:
             app.config.from_envvar('MY_SETTINGS')
     except FileNotFoundError:
+        app.config['SECRET_KEY'] = os.urandom(24)
+        app.config['DEMO_CONTENT'] = True
+        app.config['SETUP_DB'] = True
+        app.config['SETUP_BLOG'] = True
         print('Warning - Config Not Found. Using Defaults.')
-    await db_setup()
 
 
 @app.listener('after_server_start')
 async def notify_server_started(app, loop):
-    print('Server successfully started!')
+    print('Server successfully started.')
 
 
 @app.listener('before_server_stop')
 async def notify_server_stopping(app, loop):
-    print('Server shutting down!')
+    print('Server shutting down...')
 
 
-# @app.listener('after_server_stop')
-# async def close_db(app, loop):
-    # con = await db_connection()
-    # await con.close()
+@app.listener('after_server_stop')
+async def close_db(app, loop):
+    print('Server successfully shutdown.')
 
 
 @app.middleware('request')
@@ -98,17 +95,17 @@ class WelcomeForm(SanicForm):
 class DatabaseSetup(SanicForm):
     dbtype = SelectField('Database Type', choices=[('sql', 'SQLite'), ('post', 'Postgres'), ('mysql', 'MySQL')])
     database = StringField('Database Name', validators=[DataRequired()])
-    username = StringField('Password', validators=[DataRequired()])
+    username = StringField('Username', validators=[DataRequired()])
     password = PasswordField('Password', validators=[DataRequired()])
-    host = StringField('Password', validators=[DataRequired()])
+    host = StringField('Host', validators=[DataRequired()])
     submit = SubmitField('Submit')
 
 
 async def db_connection():
-    dbtype = app.config['DATABASE_TYPE']
+    dbtype = app.config['DB_TYPE']
     if dbtype is 'sql':
-        if app.config['DATABASE']:
-            dsn = app.config['DATABASE']
+        if app.config['DB_CONNECTION']:
+            dsn = app.config['DB_CONNECTION']
         else:
             dsn = 'Driver=SQLite3;Database=sqlite.db'
         return await aioodbc.connect(dsn=dsn, loop=app.loop)
@@ -116,6 +113,16 @@ async def db_connection():
         return
     elif dbtype is 'mysql':
         return
+
+async def is_setup():
+    stp = app.config['SETUP_BLOG']
+    dbs = app.config['SETUP_DB']
+    if stp and dbs:
+        return 'setup-db'
+    if stp and not dbs:
+        return 'setup-blog'
+    if not stp and not dbs:
+        return True
 
 
 async def db_setup():
@@ -163,7 +170,7 @@ async def db_setup():
     await con.close()
 
 
-async def first_start(request):
+async def setup_blog(request):
     page = dict()
     form = WelcomeForm(request)
     if request.method == 'POST' and form.validate():
@@ -172,8 +179,9 @@ async def first_start(request):
         # form.password.data
         # form.email.data
         # form.seo.data
-        # TODO: if valid information, redirect to home, save all created variables from welcome form data to db, save dbsetup info to a config file
-        return jinja.render('page.html', request, page=page)
+        # TODO: if valid information, redirect to home, save all created variables from welcome form data to db
+        app.config['SETUP_BLOG'] = False
+        return redirect('/')
     page['title'] = 'Blog First Start'
     page['header'] = 'Welcome'
     page['text'] = 'Before you get blogging, we need to setup a few things.'
@@ -181,20 +189,19 @@ async def first_start(request):
 
 
 async def setup_db(request):
-    dbs = app.config['SETUP_DB']
-    if not dbs:
-        return redirect("first-start")
     page = dict()
     form = DatabaseSetup(request)
     if request.method == 'POST' and form.validate():
-        # form.username.data
-        # form.password.data
-        # form.host.data
-        # form.database.data
-        # form.dbtype.data
-        # TODO: if valid information, redirect to first_start, save DBSetup form data to app.config
-        app.config['SETUP_DB'] = True
-        return redirect('first-start')
+        app.config['DB_NAME'] = form.username.data
+        app.config['DB_PASSWORD'] = form.password.data
+        app.config['DB_NAME'] = form.host.data
+        app.config['DB_TYPE'] = form.dbtype.data
+        # TODO: validate information, test connection
+        with open("config.py", "wt") as o:
+            for key, val in dict.items(app.config):
+                o.write(f'{key} = \'\'\'{val}\'\'\'\n')
+        app.config['SETUP_DB'] = False
+        return redirect('setup-blog')
     page['title'] = 'Blog First Start'
     page['header'] = 'Setup Database'
     page['text'] = 'Below you should enter your database connection details.'
@@ -202,14 +209,16 @@ async def setup_db(request):
 
 
 async def index(request):
+    if app.config['SETUP_BLOG']:
+        return redirect('setup-db')
     con = await db_connection()
     cur = await con.cursor()
     await cur.execute('SELECT * FROM blog_data;')
     fetch = await cur.fetchmany(4)
     if fetch is None:
         page = dict()
-        page.post_title = 'No Posts Found :('
-        page.post_excerpt = 'Sorry, We couldn\'t find any posts.'
+        page['post_title'] = 'No Posts Found :('
+        page['post_excerpt'] = 'Sorry, We couldn\'t find any posts.'
         return jinja.render('index.html', request, page=page)
     await cur.close()
     await con.close()
@@ -217,6 +226,8 @@ async def index(request):
 
 
 async def post(request, name):
+    if app.config['SETUP_BLOG']:
+        return redirect('setup-db')
     con = await db_connection()
     cur = await con.cursor()
     await cur.execute(f'SELECT * FROM blog_data WHERE post_name="{name}";')
@@ -236,6 +247,8 @@ async def dashboard(request):
 
 
 async def login(request):
+    if app.config['SETUP_BLOG']:
+        return redirect('setup-db')
     page = dict()
     form = LoginForm(request)
     if request.method == 'POST' and form.validate():
@@ -255,9 +268,11 @@ async def login(request):
             return jinja.render('page.html', request, page=page,
                                 js_head_end='<script defer>window.setTimeout(function(){ window.location = "admin"; }'
                                             ',3000);</script>')
-
     login_check = request['session'].get('username')
     if login_check is None:
+        stp = app.config['SETUP_BLOG']
+        if stp:
+            return redirect('setup-blog')
         page['title'] = 'Login'
         page['header'] = 'Restricted Area - Login Required'
         return jinja.render('page.html', request, page=page, form=form,
@@ -300,7 +315,7 @@ async def admin_styles(request):
 async def redirect_index(request):
     return redirect('/')
 
-app.add_route(first_start, 'first-start', methods=['GET', 'POST'])
+app.add_route(setup_blog, 'setup-blog', methods=['GET', 'POST'])
 app.add_route(setup_db, 'setup-db', methods=['GET', 'POST'])
 app.add_route(test, 'test')
 app.add_route(index, '/')

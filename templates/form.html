@@ -1,0 +1,20 @@
+<form role="form" method="POST">
+    {{ form.csrf_token }}
+    {% for field in form %}
+        {% if field.type == 'SubmitField'%}
+            <div class="mdl-card__actions">
+                {{ form.submit(class="mdl-button mdl-button--colored mdl-js-button mdl-js-ripple-effect") }}
+            </div>
+        {% else %}
+            <div class="mdl-textfield mdl-js-textfield">
+                {{ field(class="mdl-textfield__input") }}
+                {{ field.label(class="mdl-textfield__label") }}
+                {% for error in field.errors %}
+                <span class="mdl-textfield__error" style="visibility:visible;">
+                    *{{ error }}
+                </span>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endfor %}
+</form>
