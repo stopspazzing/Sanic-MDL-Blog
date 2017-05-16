@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
-import os
+from os import urandom, path
 
 import aioodbc
 from sanic import Sanic
@@ -11,9 +11,8 @@ from sanic_compress import Compress
 from sanic_jinja2 import SanicJinja2
 from sanic_session import InMemorySessionInterface
 from sanic_useragent import SanicUserAgent
-from sanic_wtf import SanicForm
-from wtforms import StringField, SubmitField, PasswordField, BooleanField, SelectField
-from wtforms.validators import DataRequired
+
+from forms import WelcomeForm, DatabaseForm, LoginForm
 
 app = Sanic(__name__)
 jinja = SanicJinja2(app)
@@ -29,11 +28,16 @@ async def setup_cfg(app, loop):
         if cfg is None:
             app.config.from_envvar('MY_SETTINGS')
     except FileNotFoundError:
-        app.config['SECRET_KEY'] = os.urandom(24)
+        app.config['SECRET_KEY'] = urandom(24)
         app.config['DEMO_CONTENT'] = True
+        print('Warning - Config Not Found. Using Defaults.')
+    if path.isfile('app.db'):
+        app.config['SETUP_DB'] = False
+        app.config['SETUP_BLOG'] = False
+        app.config['DB_URI'] = 'Driver=SQLite3;Database=app.db'
+    else:
         app.config['SETUP_DB'] = True
         app.config['SETUP_BLOG'] = True
-        print('Warning - Config Not Found. Using Defaults.')
 
 
 @app.listener('after_server_start')
@@ -70,49 +74,36 @@ async def ignore_404s(request, exception):
     return jinja.render('page.html', request, page=page)
 
 
-class LoginForm(SanicForm):
-    username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Sign In')
-
-
-class RegistrationForm(SanicForm):
-    username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    submit = SubmitField('Sign In')
-
-
-class WelcomeForm(SanicForm):
-    title = StringField('Site Title', validators=[DataRequired()])
-    username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password (enter twice)', validators=[DataRequired()])
-    password2 = PasswordField('Password', validators=[DataRequired()])
-    email = StringField('Your E-mail', validators=[DataRequired()])
-    seo = BooleanField('seo')
-    submit = SubmitField('Install')
-
-
-class DatabaseSetup(SanicForm):
-    dbtype = SelectField('Database Type', choices=[('sql', 'SQLite'), ('post', 'Postgres'), ('mysql', 'MySQL')])
-    database = StringField('Database Name', validators=[DataRequired()])
-    username = StringField('Username', validators=[DataRequired()])
-    password = PasswordField('Password', validators=[DataRequired()])
-    host = StringField('Host', validators=[DataRequired()])
-    submit = SubmitField('Submit')
+async def check(connection):
+    try:
+        checking = await aioodbc.connect(dsn=connection)
+        if not checking:
+            return False
+        else:
+            return True
+    except Exception:
+        print(Exception)
 
 
 async def db_connection():
-    dbtype = app.config['DB_TYPE']
-    if dbtype is 'sql':
-        if app.config['DB_CONNECTION']:
-            dsn = app.config['DB_CONNECTION']
-        else:
-            dsn = 'Driver=SQLite3;Database=sqlite.db'
-        return await aioodbc.connect(dsn=dsn, loop=app.loop)
-    elif dbtype is 'post':
-        return
-    elif dbtype is 'mysql':
-        return
+    dsn = 'Driver=SQLite3;Database=app.db'
+    return await aioodbc.connect(dsn=dsn, loop=app.loop)
+    # dbtype = app.config['DB_TYPE']
+    # if dbtype is 'sql' or None:
+    #     if app.config['DB_URI']:
+    #         dsn = app.config['DB_URI']
+    #     else:
+    #         dsn = 'Driver=SQLite3;Database=sqlite.db'
+    #     check = await aioodbc.connect(dsn=dsn, loop=app.loop)
+    #     if not check:
+    #         dsn = 'Driver=SQLite3;Database=sqlite.db'
+    #     print(dsn)
+    #     return await aioodbc.connect(dsn=dsn, loop=app.loop)
+    # elif dbtype is 'post':
+    #     return
+    # elif dbtype is 'mysql':
+    #     return
+
 
 async def is_setup():
     stp = app.config['SETUP_BLOG']
@@ -127,23 +118,11 @@ async def is_setup():
 
 async def db_setup():
     con = await db_connection()
-    await con.execute('CREATE TABLE IF NOT EXISTS blog_posts ('
-                      'Id INTEGER PRIMARY KEY,'
-                      'post_author UNSIGNED BIG INT(20) default "0",'
-                      'post_date DATETIME default "0000-00-00 00-00-00",'
-                      'post_content TEXT default "None",'
-                      'post_title TEXT default "None",'
-                      'post_excerpt TEXT default "None",'
-                      'post_status VARCHAR(20) default "publish",'
-                      'post_modified DATETIME NOT NULL,'
-                      'comment_status VARCHAR(20) default "open",'
-                      'post_password VARCHAR(20) NOT NULL,'
-                      'post_name VARCHAR(200) NOT NULL,'
-                      'post_likes VARCHAR(20) NOT NULL);')
-    await con.commit()
+    cur = await con.cursor()
     if app.config['DEMO_CONTENT']:
-        await con.execute('DROP TABLE IF EXISTS blog_posts;')
-        await con.execute('CREATE TABLE IF NOT EXISTS blog_posts ('
+        await cur.execute('DROP TABLE IF EXISTS blog_posts;')
+        await cur.commit()
+        await cur.execute('CREATE TABLE IF NOT EXISTS blog_posts ('
                           'Id INTEGER PRIMARY KEY,'
                           'post_author VARCHAR(20) DEFAULT "demo",'
                           'post_date DATETIME DEFAULT "0000-00-00 00-00-00",'
@@ -157,30 +136,84 @@ async def db_setup():
                           'comment_status VARCHAR(20) DEFAULT "open",'
                           'post_password VARCHAR(20) DEFAULT "None",'
                           'post_likes VARCHAR(20) DEFAULT "0" );')
-        cur = await con.cursor()
+        await cur.commit()
+        await cur.execute('DROP TABLE IF EXISTS blog_settings;')
+        await cur.commit()
+        await cur.execute('CREATE TABLE IF NOT EXISTS blog_settings ('
+                          'id INTEGER PRIMARY KEY,'
+                          'title TEXT default "Blog Demo",'
+                          'created_on DATETIME default "0000-00-00 00-00-00",'
+                          'username TEXT default "None",'
+                          'password VARCHAR(200) default "publish",'
+                          'email VARCHAR(50) default "None",'
+                          'hidden TEXT default "True",'
+                          'https TEXT default "off",'
+                          'user_alias VARCHAR(200) default "Demo",'
+                          'permalink TEXT default "1";')
+        await cur.commit()
         await cur.execute('SELECT * FROM blog_posts;')
         data = await cur.fetchone()
         if not data:
-            await con.execute('''INSERT INTO `blog_posts` VALUES (1,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','Coffee Pic','coffee-pic','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','coffee.jpg','publish','0000-00-00 00-00-00','open','None','60');''')
-            await con.execute('''INSERT INTO `blog_posts` VALUES (2,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','On the road again','on-the-road-again','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','road_big.jpg','publish','0000-00-00 00-00-00','open','None','50');''')
-            await con.execute('''INSERT INTO `blog_posts` VALUES (3,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','I couldn’t take any pictures but this was an amazing thing…','i-couldnt-take-any-pictures','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','road_big.jpg','publish','0000-00-00 00-00-00','open','None','40');''')
-            await con.execute('''INSERT INTO `blog_posts` VALUES (4,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','Shopping','shopping','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','shopping.jpg','publish','0000-00-00 00-00-00','open','None','30');''')
-            await con.commit()
+            await cur.execute(
+                '''INSERT INTO `blog_posts` VALUES (1,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','Coffee Pic','coffee-pic','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','coffee.jpg','publish','0000-00-00 00-00-00','open','None','60');''')
+            await cur.execute(
+                '''INSERT INTO `blog_posts` VALUES (2,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','On the road again','on-the-road-again','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','road_big.jpg','publish','0000-00-00 00-00-00','open','None','50');''')
+            await cur.execute(
+                '''INSERT INTO `blog_posts` VALUES (3,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','I couldn’t take any pictures but this was an amazing thing…','i-couldnt-take-any-pictures','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','road_big.jpg','publish','0000-00-00 00-00-00','open','None','40');''')
+            await cur.execute(
+                '''INSERT INTO `blog_posts` VALUES (4,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.<br /><br /><br />Qui ullamco consectetur aute fugiat officia ullamco proident Lorem ad irure. Sint eu ut consectetur ut esse veniam laboris adipisicing aliquip minim anim labore commodo. Incididunt eu enim enim ipsum Lorem commodo tempor duis eu ullamco tempor elit occaecat sit. Culpa eu sit voluptate ullamco ad irure. Anim commodo aliquip cillum ea nostrud commodo id culpa eu irure ut proident. Incididunt cillum excepteur incididunt mollit exercitation fugiat in. Magna irure laborum amet non ullamco aliqua eu. Aliquip adipisicing dolore irure culpa aute enim. Ullamco quis eiusmod ipsum laboris quis qui.<br /><br /><br />Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure sint fugiat nostrud. Pariatur Lorem irure excepteur Lorem non irure ea fugiat adipisicing esse nisi ullamco proident sint. Consectetur qui quis cillum occaecat ullamco veniam et Lorem cupidatat pariatur. Labore officia ex aliqua et occaecat velit dolor deserunt minim velit mollit irure. Cillum cupidatat enim officia non velit officia labore. Ut esse nisi voluptate et deserunt enim laborum qui magna sint sunt cillum. Id exercitation labore sint ea labore adipisicing deserunt enim commodo consectetur reprehenderit enim. Est anim nostrud quis non fugiat duis cillum. Aliquip enim officia ad commodo id.','Shopping','shopping','Enim labore aliqua consequat ut quis ad occaecat aliquip incididunt. Sunt nulla eu enim irure enim nostrud aliqua consectetur ad consectetur sunt ullamco officia. Ex officia laborum et consequat duis.','shopping.jpg','publish','0000-00-00 00-00-00','open','None','30');''')
+            await cur.commit()
         await cur.close()
-    await con.close()
+        await con.close()
+    else:
+        await cur.execute('CREATE TABLE IF NOT EXISTS blog_posts ('
+                          'Id INTEGER PRIMARY KEY,'
+                          'post_author UNSIGNED BIG INT(20) default "0",'
+                          'post_date DATETIME default "0000-00-00 00-00-00",'
+                          'post_content TEXT default "None",'
+                          'post_title TEXT default "None",'
+                          'post_excerpt TEXT default "None",'
+                          'post_status VARCHAR(20) default "publish",'
+                          'post_modified DATETIME NOT NULL,'
+                          'comment_status VARCHAR(20) default "open",'
+                          'post_password VARCHAR(20) NOT NULL,'
+                          'post_name VARCHAR(200) NOT NULL,'
+                          'post_likes VARCHAR(20) NOT NULL);')
+        await cur.execute('CREATE TABLE IF NOT EXISTS blog_settings ('
+                          'id INTEGER PRIMARY KEY,'
+                          'title TEXT default "Blog Demo",'
+                          'created_on DATETIME default "0000-00-00 00-00-00",'
+                          'username TEXT default "None",'
+                          'password VARCHAR(200) default "publish",'
+                          'email VARCHAR(50) default "None",'
+                          'hidden TEXT default "True",'
+                          'https TEXT de        fault "off",'
+                          'user_alias VARCHAR(200) default "Demo",'
+                          'permalink TEXT default "1";')
+        await cur.commit()
+        await con.close()
 
 
 async def setup_blog(request):
+    # issetup = await is_setup()
+    # if not issetup:
+    #     return redirect(issetup)
     page = dict()
     form = WelcomeForm(request)
     if request.method == 'POST' and form.validate():
-        # form.title.data
-        # form.username.data
-        # form.password.data
-        # form.email.data
-        # form.seo.data
+        con = await db_connection()
+        cur = await con.cursor()
+        await cur.execute(
+            f'INSERT INTO blog_settings (title,username,password,email,hidden) VALUES ({form.title.data},{form.username.data},{form.password.data},{form.email.data},{form.seo.data})')
         # TODO: if valid information, redirect to home, save all created variables from welcome form data to db
+        request['session']['username'] = form.username.data
         app.config['SETUP_BLOG'] = False
+        uri = app.config['DB_URI']
+        dbt = app.config['DB_TYPE']
+        with open("config.py", "wt") as o:
+            o.write(f'DB_URI = {repr(uri)}\n')
+            o.write(f'DB_TYPE = {repr(dbt)}\n')
+        await db_setup()
         return redirect('/')
     page['title'] = 'Blog First Start'
     page['header'] = 'Welcome'
@@ -189,17 +222,23 @@ async def setup_blog(request):
 
 
 async def setup_db(request):
+    # issetup = await is_setup()
+    # if not issetup:
+    #     return redirect(issetup)
     page = dict()
-    form = DatabaseSetup(request)
+    form = DatabaseForm(request)
     if request.method == 'POST' and form.validate():
         app.config['DB_NAME'] = form.username.data
         app.config['DB_PASSWORD'] = form.password.data
-        app.config['DB_NAME'] = form.host.data
+        app.config['DB_URI'] = form.host.data
+        if not app.config['DB_URI']:
+            app.config['DB_URI'] = 'Driver=SQLite3;Database=app.db'
         app.config['DB_TYPE'] = form.dbtype.data
-        # TODO: validate information, test connection
-        with open("config.py", "wt") as o:
-            for key, val in dict.items(app.config):
-                o.write(f'{key} = \'\'\'{val}\'\'\'\n')
+        dsn = app.config['DB_URI']
+        valid = await check(dsn)
+        if not valid:
+            print('invalid db connection')
+            return redirect('setup-db')
         app.config['SETUP_DB'] = False
         return redirect('setup-blog')
     page['title'] = 'Blog First Start'
@@ -213,7 +252,7 @@ async def index(request):
         return redirect('setup-db')
     con = await db_connection()
     cur = await con.cursor()
-    await cur.execute('SELECT * FROM blog_data;')
+    await cur.execute('SELECT * FROM blog_posts;')
     fetch = await cur.fetchmany(4)
     if fetch is None:
         page = dict()
@@ -230,7 +269,7 @@ async def post(request, name):
         return redirect('setup-db')
     con = await db_connection()
     cur = await con.cursor()
-    await cur.execute(f'SELECT * FROM blog_data WHERE post_name="{name}";')
+    await cur.execute(f'SELECT * FROM blog_posts WHERE post_name="{name}";')
     fetch = await cur.fetchone()
     if not fetch:
         raise NotFound("404 Error", status_code=404)
@@ -256,9 +295,9 @@ async def login(request):
         fpass = form.password.data
         con = await db_connection()
         cur = await con.cursor()
-        await cur.execute(f'SELECT * FROM blog_user WHERE username="{fuser}";')
+        await cur.execute(f'SELECT * FROM blog_settings WHERE username="{fuser}";')
         get_user = await cur.fetchone()
-        await cur.execute(f'SELECT * FROM blog_user WHERE password="{fpass}";')
+        await cur.execute(f'SELECT * FROM blog_settings WHERE password="{fpass}";')
         get_pass = await cur.fetchone()
         if get_user == fuser and get_pass == fpass:
             request['session']['username'] = get_user
@@ -296,9 +335,11 @@ async def logout(request):
                         js_head_end='<script defer>window.setTimeout(function(){ window.location = "/"; }'
                                     ',3000);</script>')
 
+
 # This is only for testing, nothing useful for average user
 async def test(request):
     raise NotFound("Something bad happened", status_code=404)
+
 
 async def images(request, name):
     return await file('images/' + name)
@@ -309,11 +350,12 @@ async def styles(request):
 
 
 async def admin_styles(request):
-    return await file('css/admin.css')
+    return await file('/css/admin.css')
 
 
 async def redirect_index(request):
     return redirect('/')
+
 
 app.add_route(setup_blog, 'setup-blog', methods=['GET', 'POST'])
 app.add_route(setup_db, 'setup-db', methods=['GET', 'POST'])
@@ -328,5 +370,4 @@ app.add_route(login, 'login', methods=['GET', 'POST'])
 app.add_route(logout, 'logout')
 app.add_route(redirect_index, '/index.html')
 
-if __name__ == '__main__':
-    app.run(host='127.0.0.1', port=8000, debug=True)
+app.run(host='127.0.0.1', port=8000, debug=True)
