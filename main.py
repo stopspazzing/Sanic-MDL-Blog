@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+import datetime
 from os import urandom, path
+
 import aioodbc
 from sanic import Sanic
 from sanic.exceptions import NotFound
-from sanic.response import file, redirect
+from sanic.response import redirect
 from sanic_compress import Compress
 from sanic_jinja2 import SanicJinja2
 from sanic_session import InMemorySessionInterface
 from sanic_useragent import SanicUserAgent
-import datetime
+
 from forms import WelcomeForm, DatabaseForm, LoginForm
 
 app = Sanic(__name__)
@@ -79,8 +81,9 @@ async def sql_connection():
         if not dsn:
             dsn = 'Driver=SQLite3;Database=app.db'
         return await aioodbc.connect(dsn=dsn, loop=app.loop)
-    except:
+    except Exception:
         return False
+
 
 async def sql_validate():
     if not app.config['DB_TYPE']:
@@ -110,7 +113,7 @@ async def sql_demo():
     con = await sql_connection()
     if app.config['DEMO_CONTENT']:
         await con.execute(
-            '''CREATE TABLE "blog_posts" ( `id` INTEGER DEFAULT 'None' PRIMARY KEY AUTOINCREMENT, `post_author` VARCHAR(20) DEFAULT 'Demo', `post_date` DATETIME DEFAULT '0000-00-00 00-00-00', `post_content` TEXT DEFAULT 'None', `post_title` BLOB DEFAULT 'None', `post_name` VARCHAR(200) DEFAULT 'new post', `post_excerpt` TEXT DEFAULT 'None', `post_image` VARCHAR(20) DEFAULT 'road_big.jpg', `post_status` VARCHAR(20) DEFAULT 'publish', `post_modified` DATETIME DEFAULT '0000-00-00 00-00-00', `comment_status` VARCHAR(20) DEFAULT 'open', `post_password` VARCHAR(20) DEFAULT 'None', `post_likes` VARCHAR(20) DEFAULT '0' );''')
+            '''CREATE TABLE "blog_posts" ( `id` INTEGER DEFAULT 'None' PRIMARY KEY AUTOINCREMENT, `post_author` VARCHAR(20) DEFAULT 'Demo', `post_date` DATETIME DEFAULT '0000-00-00 00-00-00', `post_content` TEXT DEFAULT 'None', `post_title` TEXT DEFAULT 'None', `post_name` VARCHAR(200) DEFAULT 'new post', `post_excerpt` TEXT DEFAULT 'None', `post_image` VARCHAR(20) DEFAULT 'road_big.jpg', `post_status` VARCHAR(20) DEFAULT 'publish', `post_modified` DATETIME DEFAULT '0000-00-00 00-00-00', `comment_status` VARCHAR(20) DEFAULT 'open', `post_password` VARCHAR(20) DEFAULT 'None', `post_likes` VARCHAR(20) DEFAULT '0' );''')
         await con.execute(
             '''CREATE TABLE "blog_settings" ( `id` INTEGER DEFAULT 'None', `title` TEXT DEFAULT 'Blog Demo', `created_on` DATETIME DEFAULT '0000-00-00 00-00-00', `username` TEXT DEFAULT 'None', `password` VARCHAR(200) DEFAULT 'publish', `email` VARCHAR(50) DEFAULT 'None', `hidden` TEXT DEFAULT 'True', `https` TEXT DEFAULT 'off', `user_alias` VARCHAR(200) DEFAULT 'Demo', `permalink` TEXT DEFAULT '1', PRIMARY KEY(`id`) );''')
         await con.execute('''INSERT INTO `blog_posts` VALUES (1,'demo','0000-00-00 00-00-00','Excepteur reprehenderit sint exercitation ipsum consequat qui sit id velit elit. Velit anim eiusmod labore sit amet. Voluptate voluptate irure occaecat deserunt incididunt esse in. Sunt velit aliquip sunt elit ex nulla reprehenderit qui ut eiusmod ipsum do. Duis veniam reprehenderit laborum occaecat id proident nulla veniam. Duis enim deserunt voluptate aute veniam sint pariatur exercitation. Irure mollit est sit labore est deserunt pariatur duis aute laboris cupidatat. Consectetur consequat esse est sit veniam adipisicing ipsum enim irure.
@@ -152,11 +155,10 @@ Cillum ullamco eu cupidatat excepteur Lorem minim sint quis officia irure irure 
         await con.commit()
     else:
         await con.execute(
-            '''CREATE TABLE "blog_posts" ( `id` INTEGER DEFAULT 'None' PRIMARY KEY AUTOINCREMENT, `post_author` VARCHAR(20) DEFAULT 'Demo', `post_date` DATETIME DEFAULT '0000-00-00 00-00-00', `post_content` TEXT DEFAULT 'None', `post_title` BLOB DEFAULT 'None', `post_name` VARCHAR(200) DEFAULT 'new post', `post_excerpt` TEXT DEFAULT 'None', `post_image` VARCHAR(20) DEFAULT 'road_big.jpg', `post_status` VARCHAR(20) DEFAULT 'publish', `post_modified` DATETIME DEFAULT '0000-00-00 00-00-00', `comment_status` VARCHAR(20) DEFAULT 'open', `post_password` VARCHAR(20) DEFAULT 'None', `post_likes` VARCHAR(20) DEFAULT '0' )''')
+            '''CREATE TABLE "blog_posts" ( `id` INTEGER DEFAULT 'None' PRIMARY KEY AUTOINCREMENT, `post_author` VARCHAR(20) DEFAULT 'Demo', `post_date` DATETIME DEFAULT '0000-00-00 00-00-00', `post_content` TEXT DEFAULT 'None', `post_title` TEXT DEFAULT 'None', `post_name` VARCHAR(200) DEFAULT 'new post', `post_excerpt` TEXT DEFAULT 'None', `post_image` VARCHAR(20) DEFAULT 'road_big.jpg', `post_status` VARCHAR(20) DEFAULT 'publish', `post_modified` DATETIME DEFAULT '0000-00-00 00-00-00', `comment_status` VARCHAR(20) DEFAULT 'open', `post_password` VARCHAR(20) DEFAULT 'None', `post_likes` VARCHAR(20) DEFAULT '0' )''')
         await con.execute(
             '''CREATE TABLE "blog_settings" ( `id` INTEGER DEFAULT 'None', `title` TEXT DEFAULT 'Blog Demo', `created_on` DATETIME DEFAULT '0000-00-00 00-00-00', `username` TEXT DEFAULT 'None', `password` VARCHAR(200) DEFAULT 'publish', `email` VARCHAR(50) DEFAULT 'None', `hidden` TEXT DEFAULT 'True', `https` TEXT DEFAULT 'off', `user_alias` VARCHAR(200) DEFAULT 'Demo', `permalink` TEXT DEFAULT '1', PRIMARY KEY(`id`) )''')
         await con.commit()
-    # await cur.close()
     await con.close()
 
 
@@ -182,7 +184,6 @@ async def setup(request):
     elif app.config['SETUP_BLOG']:
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
-            # TODO: if valid information, redirect to home, save all created variables from welcome form data to db
             request['session']['username'] = wform.username.data
             app.config['SETUP_BLOG'] = False
             uri = app.config['DB_URI']
@@ -270,6 +271,8 @@ async def login(request):
             return jinja.render('page.html', request, page=page,
                                 js_head_end='<script defer>window.setTimeout(function(){ window.location = "admin"; }'
                                             ',3000);</script>')
+        else:
+            page['error'] = 'Login Failed. Please Try Again.'
     login_check = request['session'].get('username')
     if login_check is None:
         page['title'] = 'Login'
@@ -296,33 +299,16 @@ async def logout(request):
                                     ',3000);</script>')
 
 
-# This is only for testing, nothing useful for average user
-async def test(request):
-    raise NotFound("Something bad happened", status_code=404)
-
-
-async def images(request, name):
-    return await file('images/' + name)
-
-
-async def styles(request):
-    return await file('css/styles.css')
-
-
-async def admin_styles(request):
-    return await file('css/admin.css')
-
-
 async def redirect_index(request):
     return redirect('/')
 
-
+# Static Files
+app.static('images/', './images/')
+app.static('styles.css', './css/styles.css')
+app.static('admin.css', './css/admin.css')
+# Routes
 app.add_route(setup, 'setup', methods=['GET', 'POST'])
-app.add_route(test, 'test')
 app.add_route(index, '/')
-app.add_route(images, 'images/<name>')
-app.add_route(styles, 'styles.css')
-app.add_route(admin_styles, 'admin.css')
 app.add_route(post, '/<name>')
 app.add_route(dashboard, 'admin')
 app.add_route(login, 'login', methods=['GET', 'POST'])

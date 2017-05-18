@@ -16,9 +16,10 @@
   limitations under the License
 -->
 <html lang="en">
-{% include 'head.html' %}
-<body>
-{% block body %}{% endblock %}
-{% block js_body_end %}{% endblock %}
-</body>
+    {% include 'head.html' %}
+    <body>
+        {% block body %}{% endblock %}
+            <script src="https://code.getmdl.io/1.3.0/material.min.js"></script>
+        {% block js_body_end %}{% endblock %}
+    </body>
 </html>
