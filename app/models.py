@@ -7,11 +7,29 @@ import aioodbc
 from app import app
 config = app.config
 
+async def sql_select(query, count):
+    dsn = config['DB_URI']
+    async with aioodbc.create_pool(dsn=dsn, loop=app.loop) as pool:
+        async with pool.acquire() as con:
+            async with con.cursor() as cur:
+                await cur.execute(query)
+                if count == 'all':
+                    val = await cur.fetch()
+                    return val
+                if count == 1:
+                    val = await cur.fetchone()
+                    return val
+                if count > 1:
+                    val = await cur.fetchmany(count)
+                    return val
+
+
 async def sql_connection():
     try:
         dsn = config['DB_URI']
         if not dsn:
             dsn = 'Driver=SQLite3;Database=app.db'
+            config['DB_URI'] = dsn
         return await aioodbc.connect(dsn=dsn, loop=app.loop)
     except Exception:
         print('SQL Connection Failed!')
@@ -38,7 +56,7 @@ async def sql_validate():
         except Exception:
             print('Exception')
             return False
-    print('No DB type')
+    print('Not A Valid DB Type')
     return False
 
 
