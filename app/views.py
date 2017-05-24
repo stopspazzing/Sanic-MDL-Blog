@@ -21,26 +21,27 @@ from app.models import sql_demo, sql_connection, sql_validate
 Compress(app)
 SanicUserAgent.init_app(app, default_locale='en_US')
 jinja = SanicJinja2(app)
+config = app.config
 session = InMemorySessionInterface(expiry=600)
 
 
 @app.listener('before_server_start')
 async def setup_cfg(app, loop):
-    app.config['SECRET_KEY'] = urandom(24)
-    app.config['DEMO_CONTENT'] = True
+    config['SECRET_KEY'] = urandom(24)
+    config['DEMO_CONTENT'] = True
     if path.isfile('*.db'):
-        app.config['SETUP_DB'] = False
-        app.config['SETUP_BLOG'] = False
+        config['SETUP_DB'] = False
+        config['SETUP_BLOG'] = False
     else:
-        app.config['SETUP_DB'] = True
-        app.config['SETUP_BLOG'] = True
+        config['SETUP_DB'] = True
+        config['SETUP_BLOG'] = True
     try:
-        cfg = app.config.from_pyfile('config.py')
+        cfg = config.from_pyfile('config.py')
         if cfg is None:
-            app.config.from_envvar('MY_SETTINGS')
+            config.from_envvar('MY_SETTINGS')
         print('Successfully imported config.')
     except FileNotFoundError:
-        app.config['DEMO_CONTENT'] = True
+        config['DEMO_CONTENT'] = True
         print('Warning - Config Not Found. Using Defaults.')
 
 
@@ -80,30 +81,30 @@ async def ignore_404s(request, exception):
 
 async def setup(request):
     page = dict()
-    if app.config['SETUP_DB']:
+    if config['SETUP_DB']:
         dform = DatabaseForm(request)
         if request.method == 'POST' and dform.validate():
-            app.config['DB_NAME'] = dform.username.data
-            app.config['DB_PASSWORD'] = dform.password.data
-            app.config['DB_URI'] = dform.host.data
-            app.config['DB_TYPE'] = dform.dbtype.data
+            config['DB_NAME'] = dform.username.data
+            config['DB_PASSWORD'] = dform.password.data
+            config['DB_URI'] = dform.host.data
+            config['DB_TYPE'] = dform.dbtype.data
             valid = await sql_validate()
             if not valid:
                 print('Error - DB Not Valid')
-                return redirect('setup')
-            app.config['SETUP_DB'] = False
-            return redirect('setup')
+                return redirect(app.url_for('setup'))
+            config['SETUP_DB'] = False
+            return redirect(app.url_for('setup'))
         page['title'] = 'Blog First Start'
         page['header'] = 'Setup Database'
         page['text'] = 'Below you should enter your database connection details.'
         return jinja.render('page.html', request, page=page, form=dform)
-    elif app.config['SETUP_BLOG']:
+    elif config['SETUP_BLOG']:
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
             request['session']['username'] = wform.username.data
-            app.config['SETUP_BLOG'] = False
-            uri = app.config['DB_URI']
-            dbt = app.config['DB_TYPE']
+            config['SETUP_BLOG'] = False
+            uri = config['DB_URI']
+            dbt = config['DB_TYPE']
             with open("config.py", "wt") as o:
                 o.write(f'DB_URI = {repr(uri)}\n')
                 o.write(f'DB_TYPE = {repr(dbt)}\n')
@@ -133,7 +134,7 @@ async def setup(request):
 async def index(request):
     con = await sql_connection()
     if not con:
-        return redirect('setup')
+        return redirect(app.url_for('setup'))
     cur = await con.cursor()
     await cur.execute('SELECT * FROM blog_posts;')
     fetch = await cur.fetchmany(4)
@@ -150,7 +151,7 @@ async def index(request):
 async def post(request, name):
     con = await sql_connection()
     if not con:
-        return redirect('setup')
+        return redirect(app.url_for('setup'))
     cur = await con.cursor()
     await cur.execute(f'SELECT * FROM blog_posts WHERE post_name="{name}";')
     fetch = await cur.fetchone()
@@ -171,7 +172,7 @@ async def dashboard(request):
 async def login(request):
     con = await sql_connection()
     if not con:
-        return redirect('setup')
+        return redirect(app.url_for('setup'))
     page = dict()
     lform = LoginForm(request)
     if request.method == 'POST' and lform.validate():
@@ -221,9 +222,8 @@ async def redirect_index(request):
     return redirect('/')
 
 # Static Files
-app.static('images/', './images/')
-app.static('styles.css', './css/styles.css')
-app.static('admin.css', './css/admin.css')
+app.static('images/', './app/static/images/')
+app.static('css/', './app/static/css/')
 
 # Routes
 app.add_route(setup, 'setup', methods=['GET', 'POST'])

@@ -13,19 +13,19 @@ body::before {
 @media (max-width: 512px)  and (min-resolution: 1.5dppx),
        (max-width: 1024px) and (max-resolution: 1.5dppx) {
   body::before {
-    background-image: url('images/bg_1024.jpg');
+    background-image: url('../images/bg_1024.jpg');
   }
 }
 @media (min-width: 513px)  and (max-width: 1024px) and (min-resolution: 1.5dppx),
        (min-width: 1025px) and (max-width: 2048px) and (max-resolution: 1.5dppx)  {
   body::before {
-    background-image: url('images/bg_2048.jpg');
+    background-image: url('../images/bg_2048.jpg');
   }
 }
 @media (min-width: 1025px) and (min-resolution: 1.5dppx),
        (min-width: 2049px) and (max-resolution: 1.5dppx) {
   body::before {
-    background-image: url('images/bg_2880.jpg');
+    background-image: url('../images/bg_2880.jpg');
   }
 }
 body .demo-blog {
@@ -131,7 +131,7 @@ body .demo-blog {
   order: -1;
 }
 .demo-blog .coffee-pic .mdl-card__media {
-  background-image: url('images/coffee.jpg');
+  background-image: url('../images/coffee.jpg');
 }
 .demo-blog .something-else .mdl-card__media {
   display: flex;
@@ -162,10 +162,10 @@ body .demo-blog {
   border-bottom-right-radius: 2px;
 }
 .demo-blog .on-the-road-again .mdl-card__media {
-  background-image: url('images/road.jpg');
+  background-image: url('../images/road.jpg');
 }
 .demo-blog .shopping .mdl-card__media {
-  background-image: url('images/shopping.jpg');
+  background-image: url('../images/shopping.jpg');
 }
 .demo-blog .demo-blog__posts > .demo-nav {
   margin: 12px 15px;
@@ -216,7 +216,7 @@ body .demo-blog {
   background-color: transparent;
 }
 .demo-blog--blogpost .demo-blog__posts > .mdl-card .mdl-card__media {
-  background-image: url('images/road_big.jpg');
+  background-image: url('../images/road_big.jpg');
   height: 280px;
 }
 .demo-blog--blogpost .comments {
@@ -332,7 +332,7 @@ body .demo-blog {
 .demo-blog .minilogo {
   width: 44px;
   height: 44px;
-  background-image: url('images/avatar.png');
+  background-image: url('../images/avatar.png');
   background-position: center;
   background-repeat: no-repeat;
   background-size: 50%;

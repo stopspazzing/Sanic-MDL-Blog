@@ -10,16 +10,16 @@
             {% if loop.first %}
             <div class="mdl-card {{data.post_name}} mdl-cell mdl-cell--8-col">
                 <div class="mdl-card__media mdl-color-text--grey-50">
-                    <h3><a href="{{data.post_name}}">{{data.post_title}}</a></h3>
+                    <h3><a href="{{ data.post_name }}">{{ data.post_title }}</a></h3>
                 </div>
                 <div class="mdl-card__supporting-text meta mdl-color-text--grey-600">
                     <div class="minilogo"></div>
                     <div>
-                        <strong>{{data.post_author}}</strong>
+                        <strong>{{ data.post_author }}</strong>
                         <span>{% if data.post_date == None %}
                             A long time ago
                           {% else %}
-                            {{data.post_date}}
+                            {{ data.post_date }}
                           {% endif %}
                     </span>
                     </div>
@@ -37,7 +37,7 @@
                 </div>
                 <div class="mdl-card__supporting-text meta meta--fill mdl-color-text--grey-600">
                     <div>
-                        <strong>The Newist</strong>
+                        <strong>{{ data.post_author }}</strong>
                     </div>
                     <ul class="mdl-menu mdl-js-menu mdl-menu--bottom-right mdl-js-ripple-effect" for="menubtn">
                         <li class="mdl-menu__item">About</li>
@@ -54,20 +54,20 @@
             {% else %}
             <div class="mdl-card {{data.post_name}} mdl-cell mdl-cell--12-col">
                 <div class="mdl-card__media mdl-color-text--grey-50"
-                     style="background-image: url(images/{{data.post_image}})">
-                    <h3><a href="{{data.post_name}}">{{data.post_title}}</a></h3>
+                     style="background-image: url(images/{{ data.post_image }})">
+                    <h3><a href="{{data.post_name}}">{{ data.post_title }}</a></h3>
                 </div>
                 <div class="mdl-color-text--grey-600 mdl-card__supporting-text">
-                    {{data.post_content[0:200]}}
+                    {{ data.post_content[0:200] }}
                 </div>
                 <div class="mdl-card__supporting-text meta mdl-color-text--grey-600">
                     <div class="minilogo"></div>
                     <div>
-                        <strong>{{data.post_author}}</strong>
+                        <strong>{{ data.post_author }}</strong>
                         <span>{% if data.post_date == None %}
                         A long time ago
                     {% else %}
-                        {{data.post_date}}
+                        {{ data.post_date }}
                     {% endif %}
                 </span>
                     </div>
