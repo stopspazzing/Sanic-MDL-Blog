@@ -8,7 +8,10 @@ from app import app
 config = app.config
 
 async def sql_select(query, count):
-    dsn = config['DB_URI']
+    try:
+        dsn = config['DB_URI']
+    except Exception:
+        return None
     async with aioodbc.create_pool(dsn=dsn, loop=app.loop) as pool:
         async with pool.acquire() as con:
             async with con.cursor() as cur:
@@ -36,28 +39,26 @@ async def sql_connection():
         return False
 
 
-async def sql_validate():
-    if not config['DB_TYPE']:
-        config['DB_TYPE'] = 'sql'
-    dbtype = config['DB_TYPE']
-    if dbtype == 'sql' or None:
-        if not config['DB_NAME']:
-            dbname = 'app.db'
+async def sql_validate(user, password, name, host, dbtype):
+    print(user)
+    print(password)
+    print(name)
+    print(host)
+    print(dbtype)
+    if dbtype == 'sql':
+        if not name:
+            db = 'app.db'
         else:
-            dbname = config['DB_NAME']
-        conn = f'Driver=SQLite3;Database={dbname}'
-        try:
-            test = await aioodbc.connect(dsn=conn, loop=app.loop)
-            if not test:
-                return False
-            else:
-                config['DB_URI'] = conn
-                return True
-        except Exception:
-            print('Exception')
-            return False
-    print('Not A Valid DB Type')
-    return False
+            db = name.join('.db')
+            print(db)
+        config['DB_URI'] = f'Driver=SQLite3;Database={db}'
+        config['DB_TYPE'] = dbtype
+    # TODO: Add postgre and mysql connection options
+    conn = await sql_connection()
+    if conn:
+        return True
+    else:
+        return False
 
 
 async def sql_demo():

@@ -11,6 +11,7 @@ from sanic_compress import Compress
 from sanic_jinja2 import SanicJinja2
 from sanic_session import InMemorySessionInterface
 from sanic_useragent import SanicUserAgent
+from sanic_auth import Auth
 
 # local imports
 from app import app
@@ -21,6 +22,7 @@ from app.models import sql_demo, sql_connection, sql_validate, sql_select
 Compress(app)
 SanicUserAgent.init_app(app, default_locale='en_US')
 jinja = SanicJinja2(app)
+auth = Auth(app)
 config = app.config
 jrender = jinja.render
 session = InMemorySessionInterface(expiry=600)
@@ -30,6 +32,7 @@ session = InMemorySessionInterface(expiry=600)
 async def setup_cfg(app, loop):
     config['SECRET_KEY'] = urandom(24)
     config['DEMO_CONTENT'] = True
+    config['AUTH_LOGIN_ENDPOINT'] = 'login'
     if path.isfile('*.db'):
         config['SETUP_DB'] = False
         config['SETUP_BLOG'] = False
@@ -85,11 +88,7 @@ async def setup(request):
     if config['SETUP_DB']:
         dform = DatabaseForm(request)
         if request.method == 'POST' and dform.validate():
-            config['DB_NAME'] = dform.username.data
-            config['DB_PASSWORD'] = dform.password.data
-            config['DB_URI'] = dform.host.data
-            config['DB_TYPE'] = dform.dbtype.data
-            valid = await sql_validate()
+            valid = await sql_validate(dform.user.data, dform.password.data, dform.name.data, dform.host.data, dform.type.data)
             if not valid:
                 print('Error - DB Not Valid')
                 return redirect(app.url_for('setup'))
@@ -102,7 +101,7 @@ async def setup(request):
     elif config['SETUP_BLOG']:
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
-            request['session']['username'] = wform.username.data
+            auth.login_user(request, wform.username.data)
             config['SETUP_BLOG'] = False
             uri = config['DB_URI']
             dbt = config['DB_TYPE']
@@ -136,9 +135,9 @@ async def index(request):
     fetch = await sql_select('SELECT * FROM blog_posts;', 4)
     if fetch is None:
         page = dict()
-        page['post_title'] = 'No Posts Found :('
-        page['post_excerpt'] = 'Sorry, We couldn\'t find any posts.'
-        return jrender('index.html', request, page=page)
+        page['header'] = 'No Posts Found :('
+        page['text'] = 'Sorry, We couldn\'t find any posts.'
+        return jrender('page.html', request, page=page)
     return jrender('index.html', request, page=fetch)
 
 
@@ -149,10 +148,8 @@ async def post(request, name):
     return jrender('post.html', request, post=fetch)
 
 
+@auth.login_required
 async def dashboard(request):
-    cookie_check = request['session'].get('username')
-    if cookie_check is None:
-        return redirect('login')
     return jrender('admin.html', request, pagename='Dashboard')
 
 
@@ -164,7 +161,7 @@ async def login(request):
         fpass = lform.password.data
         fetch = await sql_select(f'SELECT * FROM "blog_settings" WHERE `username`="{fuser}" AND `password`="{fpass}";', 1)
         if fetch is not None:
-            request['session']['username'] = fuser
+            auth.login_user(request, fuser)
             page['title'] = 'Login'
             page['header'] = 'Thank you for logging in!'
             page['text'] = 'Redirecting in 3 seconds...'
@@ -188,9 +185,10 @@ async def login(request):
                                '</script>')
 
 
+@auth.login_required
 async def logout(request):
     page = dict()
-    del request['session']['username']
+    auth.logout_user(request)
     page['title'] = 'Logging Out'
     page['header'] = 'You have been successfully logged out'
     page['text'] = 'Redirecting in 3 seconds...'
