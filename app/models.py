@@ -7,6 +7,7 @@ import aioodbc
 from app import app
 config = app.config
 
+
 async def sql_select(query, count):
     try:
         dsn = config['DB_URI']
@@ -29,7 +30,7 @@ async def sql_select(query, count):
 
 async def sql_connection():
     try:
-        dsn = config['DB_URI']
+        dsn = 'Driver=SQLite3;Database=app.db'
         if not dsn:
             dsn = 'Driver=SQLite3;Database=app.db'
             config['DB_URI'] = dsn
@@ -40,17 +41,11 @@ async def sql_connection():
 
 
 async def sql_validate(user, password, name, host, dbtype):
-    print(user)
-    print(password)
-    print(name)
-    print(host)
-    print(dbtype)
     if dbtype == 'sql':
         if not name:
             db = 'app.db'
         else:
             db = name.join('.db')
-            print(db)
         config['DB_URI'] = f'Driver=SQLite3;Database={db}'
         config['DB_TYPE'] = dbtype
     # TODO: Add postgre and mysql connection options

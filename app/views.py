@@ -101,7 +101,7 @@ async def setup(request):
     elif config['SETUP_BLOG']:
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
-            auth.login_user(request, wform.username.data)
+            #auth.login_user(request, wform.username.data)
             config['SETUP_BLOG'] = False
             uri = config['DB_URI']
             dbt = config['DB_TYPE']
