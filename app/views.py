@@ -22,17 +22,16 @@ from app.models import sql_demo, sql_connection, sql_validate, sql_select
 Compress(app)
 SanicUserAgent.init_app(app, default_locale='en_US')
 jinja = SanicJinja2(app)
-auth = Auth(app)
 config = app.config
 jrender = jinja.render
 session = InMemorySessionInterface(expiry=600)
+config['AUTH_LOGIN_ENDPOINT'] = 'login'
 
 
 @app.listener('before_server_start')
 async def setup_cfg(app, loop):
     config['SECRET_KEY'] = urandom(24)
     config['DEMO_CONTENT'] = True
-    config['AUTH_LOGIN_ENDPOINT'] = 'login'
     if path.isfile('*.db'):
         config['SETUP_DB'] = False
         config['SETUP_BLOG'] = False
@@ -82,6 +81,16 @@ async def ignore_404s(request, exception):
     page['text'] = 'We Can\'t Seem To Find ' + request.url
     return jrender('page.html', request, page=page)
 
+auth = Auth(app)
+
+@auth.serializer
+def serialize(username):
+    return username  # because you are using a string here[1] as the user token
+
+@auth.user_loader
+def load_user(name):
+    user = # look up user info by 'name' from database
+    return user
 
 async def setup(request):
     page = dict()
@@ -101,7 +110,7 @@ async def setup(request):
     elif config['SETUP_BLOG']:
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
-            #auth.login_user(request, wform.username.data)
+            auth.login_user(request, wform.username.data)
             config['SETUP_BLOG'] = False
             uri = config['DB_URI']
             dbt = config['DB_TYPE']
