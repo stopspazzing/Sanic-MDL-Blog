@@ -11,7 +11,7 @@ from sanic_compress import Compress
 from sanic_jinja2 import SanicJinja2
 from sanic_session import InMemorySessionInterface
 from sanic_useragent import SanicUserAgent
-from sanic_auth import Auth
+from sanic_auth import Auth, User
 
 # local imports
 from app import app
@@ -22,17 +22,16 @@ from app.models import sql_demo, sql_connection, sql_validate, sql_select
 Compress(app)
 SanicUserAgent.init_app(app, default_locale='en_US')
 jinja = SanicJinja2(app)
-auth = Auth(app)
 config = app.config
 jrender = jinja.render
 session = InMemorySessionInterface(expiry=600)
+config['AUTH_LOGIN_ENDPOINT'] = 'login'
 
 
 @app.listener('before_server_start')
 async def setup_cfg(app, loop):
     config['SECRET_KEY'] = urandom(24)
     config['DEMO_CONTENT'] = True
-    config['AUTH_LOGIN_ENDPOINT'] = 'login'
     if path.isfile('*.db'):
         config['SETUP_DB'] = False
         config['SETUP_BLOG'] = False
@@ -82,6 +81,7 @@ async def ignore_404s(request, exception):
     page['text'] = 'We Can\'t Seem To Find ' + request.url
     return jrender('page.html', request, page=page)
 
+auth = Auth(app)
 
 async def setup(request):
     page = dict()
@@ -101,7 +101,8 @@ async def setup(request):
     elif config['SETUP_BLOG']:
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
-            #auth.login_user(request, wform.username.data)
+            user = User(id=1, name=wform.username.data)
+            auth.login_user(request, user)
             config['SETUP_BLOG'] = False
             uri = config['DB_URI']
             dbt = config['DB_TYPE']
@@ -161,7 +162,8 @@ async def login(request):
         fpass = lform.password.data
         fetch = await sql_select(f'SELECT * FROM "blog_settings" WHERE `username`="{fuser}" AND `password`="{fpass}";', 1)
         if fetch is not None:
-            auth.login_user(request, fuser)
+            user = User(id=1,name=fuser)
+            auth.login_user(request, user)
             page['title'] = 'Login'
             page['header'] = 'Thank you for logging in!'
             page['text'] = 'Redirecting in 3 seconds...'
