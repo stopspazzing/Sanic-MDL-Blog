@@ -30,7 +30,7 @@ async def sql_select(query, count):
 
 async def sql_connection():
     try:
-        dsn = 'Driver=SQLite3;Database=app.db'
+        dsn = config['DB_URI']
         if not dsn:
             dsn = 'Driver=SQLite3;Database=app.db'
             config['DB_URI'] = dsn
@@ -41,7 +41,8 @@ async def sql_connection():
 
 
 async def sql_validate(user, password, name, host, dbtype):
-    if dbtype == 'sql':
+    if dbtype == 'sqlite':
+        # Verify all required values
         if not name:
             db = 'app.db'
         else:
@@ -49,6 +50,30 @@ async def sql_validate(user, password, name, host, dbtype):
         config['DB_URI'] = f'Driver=SQLite3;Database={db}'
         config['DB_TYPE'] = dbtype
     # TODO: Add postgre and mysql connection options
+    if dbtype == 'postgre':
+        # Verify all required values
+        if not user:
+            cuser = 'root'
+        if not password:
+            cpassword = ''
+        if not name:
+            cname = 'mdl_blog_db'
+        if not host:
+            chost = 'localhost'
+        config['DB_URI'] = f'DRIVER=PostgreSQL;SERVER={chost};DATABASE={cname};UID={cuser};PWD={cpassword}'
+        config['DB_TYPE'] = dbtype
+    if dbtype == 'mysql':
+        # Verify all required values
+        if not user:
+            cuser = 'root'
+        if not password:
+            cpassword = ''
+        if not name:
+            cname = 'mdl_blog_db'
+        if not host:
+            chost = 'localhost'
+        config['DB_URI'] = f'DRIVER=MySQL;SERVER={chost};DATABASE={cname};USER={cuser};PASSWORD={cpassword}'
+        config['DB_TYPE'] = dbtype
     conn = await sql_connection()
     if conn:
         return True

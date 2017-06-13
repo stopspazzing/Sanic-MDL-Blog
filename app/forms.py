@@ -1,8 +1,12 @@
+# app/forms.py
+
+# 3rd party imports
 from sanic_wtf import SanicForm
 from wtforms import StringField, SubmitField, PasswordField, BooleanField, SelectField
 from wtforms.validators import DataRequired, EqualTo, Length, Email, InputRequired
 
 
+# Forms
 class LoginForm(SanicForm):
     """
     Admin Login Form
@@ -31,7 +35,7 @@ class DatabaseForm(SanicForm):
     """
     Setup Database Form
     """
-    type = SelectField('Database Type', choices=[('sql', 'SQLite'), ('post', 'Postgres'), ('mysql', 'MySQL')])
+    type = SelectField('Database Type', choices=[('sqlite', 'SQLite'), ('postgre', 'PostgreSQL'), ('mysql', 'MySQL')])
     name = StringField('Database Name')
     user = StringField('Username')
     password = PasswordField('Password')
