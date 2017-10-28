@@ -39,5 +39,5 @@ class DatabaseForm(SanicForm):
     name = StringField('Database Name')
     user = StringField('Username')
     password = PasswordField('Password')
-    host = StringField('Host')
+    host = StringField('Host', default='127.0.0.1')
     submit = SubmitField('Submit')

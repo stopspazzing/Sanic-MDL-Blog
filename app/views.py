@@ -11,7 +11,7 @@ from sanic_compress import Compress
 from sanic_jinja2 import SanicJinja2
 from sanic_session import InMemorySessionInterface
 from sanic_useragent import SanicUserAgent
-from sanic_auth import Auth, User
+from sanic_auth import Auth
 
 # local imports
 from app import app
@@ -83,6 +83,17 @@ async def ignore_404s(request, exception):
 
 auth = Auth(app)
 
+
+@auth.serializer
+def serialize(username):
+    return username  # because you are using a string here[1] as the user token
+
+
+@auth.user_loader
+def load_user(name):
+    user = name  # look up user info by 'name' from database
+    return user
+
 async def setup(request):
     page = dict()
     if config['SETUP_DB']:
@@ -101,8 +112,7 @@ async def setup(request):
     elif config['SETUP_BLOG']:
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
-            user = User(id=1, name=wform.username.data)
-            auth.login_user(request, user)
+            auth.login_user(request, wform.username.data)
             config['SETUP_BLOG'] = False
             uri = config['DB_URI']
             dbt = config['DB_TYPE']
@@ -162,8 +172,7 @@ async def login(request):
         fpass = lform.password.data
         fetch = await sql_select(f'SELECT * FROM "blog_settings" WHERE `username`="{fuser}" AND `password`="{fpass}";', 1)
         if fetch is not None:
-            user = User(id=1,name=fuser)
-            auth.login_user(request, user)
+            auth.login_user(request, fuser)
             page['title'] = 'Login'
             page['header'] = 'Thank you for logging in!'
             page['text'] = 'Redirecting in 3 seconds...'

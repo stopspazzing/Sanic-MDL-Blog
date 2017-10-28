@@ -2,6 +2,8 @@
 
 # 3rd party imports
 import aioodbc
+import aiomysql
+import asyncpg
 
 # local imports
 from app import app
@@ -11,76 +13,92 @@ config = app.config
 async def sql_select(query, count):
     try:
         dsn = config['DB_URI']
+        dbtype = config['DB_TYPE']
     except Exception:
         return None
-    async with aioodbc.create_pool(dsn=dsn, loop=app.loop) as pool:
-        async with pool.acquire() as con:
-            async with con.cursor() as cur:
-                await cur.execute(query)
-                if count == 'all':
-                    val = await cur.fetch()
-                    return val
-                if count == 1:
-                    val = await cur.fetchone()
-                    return val
-                if count > 1:
-                    val = await cur.fetchmany(count)
-                    return val
+    if dbtype == 'sql':
+        async with aioodbc.create_pool(dsn=dsn, loop=app.loop) as pool:
+            async with pool.acquire() as con:
+                async with con.cursor() as cur:
+                    await cur.execute(query)
+                    if count == 'all':
+                        val = await cur.fetch()
+                        return val
+                    if count == 1:
+                        val = await cur.fetchone()
+                        return val
+                    if count > 1:
+                        val = await cur.fetchmany(count)
+                        return val
+    elif dbtype == 'post':
+        async with asyncpg.create_pool(dsn=dsn, loop=app.loop) as pool:
+            async with pool.acquire() as con:
+                async with con.cursor() as cur:
+                    await cur.execute(query)
+                    if count == 'all':
+                        val = await cur.fetch()
+                        return val
+                    if count == 1:
+                        val = await cur.fetchone()
+                        return val
+                    if count > 1:
+                        val = await cur.fetchmany(count)
+                        return val
+    elif dbtype == 'mysql':
+        async with aiomysql.create_pool(dsn=dsn, loop=app.loop) as pool:
+            async with pool.acquire() as con:
+                async with con.cursor() as cur:
+                    await cur.execute(query)
+                    if count == 'all':
+                        val = await cur.fetch()
+                        return val
+                    if count == 1:
+                        val = await cur.fetchone()
+                        return val
+                    if count > 1:
+                        val = await cur.fetchmany(count)
+                        return val
 
 
 async def sql_connection():
     try:
-        dsn = config['DB_URI']
-        if not dsn:
+        dbtype = config['DB_TYPE']
+        if dbtype == 'sql':
             dsn = 'Driver=SQLite3;Database=app.db'
-            config['DB_URI'] = dsn
-        return await aioodbc.connect(dsn=dsn, loop=app.loop)
+            if not dsn:
+                dsn = 'Driver=SQLite3;Database=app.db'
+                config['DB_URI'] = dsn
+            return await aioodbc.connect(dsn=dsn, loop=app.loop)
+        elif dbtype == 'post':
+            # TODO fix this
+            return await aioodbc.connect(dsn=dsn, loop=app.loop)
+        elif dbtype == 'mysql':
+            # TODO fix this
+            return await aioodbc.connect(dsn=dsn, loop=app.loop)
     except Exception:
         print('SQL Connection Failed!')
         return False
 
 
 async def sql_validate(user, password, name, host, dbtype):
-    if dbtype == 'sqlite':
-        # Verify all required values
+    if dbtype == 'sql':
         if not name:
             db = 'app.db'
         else:
             db = name.join('.db')
         config['DB_URI'] = f'Driver=SQLite3;Database={db}'
         config['DB_TYPE'] = dbtype
-    # TODO: Add postgre and mysql connection options
-    if dbtype == 'postgre':
-        # Verify all required values
-        if not user:
-            cuser = 'root'
-        if not password:
-            cpassword = ''
-        if not name:
-            cname = 'mdl_blog_db'
-        if not host:
-            chost = 'localhost'
-        config['DB_URI'] = f'DRIVER=PostgreSQL;SERVER={chost};DATABASE={cname};UID={cuser};PWD={cpassword}'
-        config['DB_TYPE'] = dbtype
-    if dbtype == 'mysql':
-        # Verify all required values
-        if not user:
-            cuser = 'root'
-        if not password:
-            cpassword = ''
-        if not name:
-            cname = 'mdl_blog_db'
-        if not host:
-            chost = 'localhost'
-        config['DB_URI'] = f'DRIVER=MySQL;SERVER={chost};DATABASE={cname};USER={cuser};PASSWORD={cpassword}'
-        config['DB_TYPE'] = dbtype
+    elif dbtype == 'post':  # postgre form option
+        return False  # TODO fix this
+    elif dbtype == 'mysql':  # mysql form option
+        return False  # TODO fix this
     conn = await sql_connection()
     if conn:
         return True
     else:
         return False
 
-
+# TODO needs to be converted to sqlalchemy tables
 async def sql_demo():
     con = await sql_connection()
     if config['DEMO_CONTENT']:
