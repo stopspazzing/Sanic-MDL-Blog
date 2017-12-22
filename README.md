@@ -5,6 +5,12 @@ A [Sanic](https://github.com/channelcat/sanic) ([asynchronous](http://stackoverf
 ## Prerequisites
 You need several packages first for all pip packages to completely install.
 
+NOTICE:
+```
+While I have gotten this to work on Windows with Sanic 4.1, this will not run on Windows with Sanic 5+,
+not by choice, but because required packages for Sanic aren't supported on Windows at this time.
+```
+
 So here is a list of packages required:
 ```
 python & python-dev >=3.6
@@ -37,12 +43,6 @@ MY_SETTINGS=/path/to/config_file python3 main.py
 ```
 
 ## Starting Server
-
-NOTICE:
-```
-While I have gotten this to work on Windows with Sanic 4.1, this will not run on Windows with Sanic 5+,
-not by choice, but because required packages for Sanic aren't supported on Windows at this time.
-```
 
 To start the server: `python3 run.py`
 
