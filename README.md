@@ -47,3 +47,10 @@ not by choice, but because required packages for Sanic aren't supported on Windo
 To start the server: `python3 run.py`
 
 To access server: http://127.0.0.1:8000
+
+## TODO
+
+1. Move to mysql database
+2. Complete support for postgre
+3. Admin Page completion
+4. Possibly most common plugins for wordpress sites (contact forms, yoast) as built in features you could enable.
