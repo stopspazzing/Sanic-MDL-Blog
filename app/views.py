@@ -83,6 +83,7 @@ async def ignore_404s(request, exception):
 
 auth = Auth(app)
 
+
 async def setup(request):
     page = dict()
     if config['SETUP_DB']:

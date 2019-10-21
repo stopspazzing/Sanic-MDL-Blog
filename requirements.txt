@@ -7,4 +7,4 @@ sanic-useragent
 sanic_auth
 wtforms
 sanic_wtf >= 0.4.0
-aioodbc
+Databases

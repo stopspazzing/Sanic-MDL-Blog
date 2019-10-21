@@ -1,7 +1,7 @@
 # app/models.py
 
 # 3rd party imports
-import aioodbc
+from databases import Database as dbase
 
 # local imports
 from app import app
@@ -13,8 +13,8 @@ async def sql_select(query, count):
         dsn = config['DB_URI']
     except Exception:
         return None
-    async with aioodbc.create_pool(dsn=dsn, loop=app.loop) as pool:
-        async with pool.acquire() as con:
+    async with dbase(url=dsn) as database:
+        async with database.connect() as con:
             async with con.cursor() as cur:
                 await cur.execute(query)
                 if count == 'all':
@@ -34,14 +34,15 @@ async def sql_connection():
         if not dsn:
             dsn = 'Driver=SQLite3;Database=app.db'
             config['DB_URI'] = dsn
-        return await aioodbc.connect(dsn=dsn, loop=app.loop)
+        async with dbase(url=dsn) as database:
+            return await database.connect()
     except Exception:
         print('SQL Connection Failed!')
         return False
 
 
 async def sql_validate(user, password, name, host, dbtype):
-    if dbtype == 'sql':
+    if dbtype == 'lite':
         if not name:
             db = 'app.db'
         else:
@@ -49,6 +50,22 @@ async def sql_validate(user, password, name, host, dbtype):
         config['DB_URI'] = f'Driver=SQLite3;Database={db}'
         config['DB_TYPE'] = dbtype
     # TODO: Add postgre and mysql connection options
+    #     if dbtype == 'postgres':
+    #         if not name:
+    #             db = 'blank'
+    #         else:
+    #             db = 'postgresql://localhost/example'
+    #         config['DB_URI'] = f'Driver=Postgresql;Database={db}'
+    #         config['DB_TYPE'] = dbtype
+    #       if dbtype == 'mysql':
+    #              if not name:
+    #                  db = 'blank'
+    #              else:
+    #                  db = 'mysql://localhost/example'
+    #              config['DB_URI'] = f'Driver=MySQL;Database={db}'
+    #              config['DB_TYPE'] = dbtype
+    #
+    #
     conn = await sql_connection()
     if conn:
         return True
