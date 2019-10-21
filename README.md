@@ -7,8 +7,7 @@ You need several packages first for all pip packages to completely install.
 
 NOTICE:
 ```
-While I have gotten this to work on Windows with Sanic 4.1, this will not run on Windows with Sanic 5+,
-not by choice, but because required packages for Sanic aren't supported on Windows at this time.
+Working on Windows with Visual C++ v14 installed. Please use instructions here: https://www.scivision.dev/python-windows-visual-c-14-required/
 ```
 
 So here is a list of packages required:
@@ -29,13 +28,15 @@ libsqliteodbc
 
 100% following Sanic's import from config:
 http://sanic.readthedocs.io/en/latest/sanic/config.html#from-a-file
+For Database connection urls, use https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
 
 Example config:
 ```
-DB_URI = 'Driver=SQLite3;Database=app.db'
-DB_TYPE = 'sql'
+DB_URI = 'sqlite:///app.db'
+DB_TYPE = 'sqlite'
 DEMO_CONTENT = False
 ```
+
 
 Either you can create a config file `config.py` file in same directory as `main.py` or you may load the program with the location of the file to variable config_file like so:
 ```
@@ -50,7 +51,6 @@ To access server: http://127.0.0.1:8000
 
 ## TODO
 
-1. Move to mysql database
-2. Complete support for postgre
-3. Admin Page completion
-4. Possibly most common plugins for wordpress sites (contact forms, yoast) as built in features you could enable.
+1. Finish Database support
+2. Admin Page completion
+3. Possibly most common plugins for Wordpress sites (Contact Forms, Yoast) as built in features you could enable.
