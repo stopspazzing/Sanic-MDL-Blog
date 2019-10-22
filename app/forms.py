@@ -31,9 +31,9 @@ class DatabaseForm(SanicForm):
     """
     Setup Database Form
     """
-    type = SelectField('Database Type', choices=[('sql', 'SQLite'), ('post', 'Postgres'), ('mysql', 'MySQL')])
+    type = SelectField('Database Type', choices=[('sqlite', 'SQLite'), ('postgresql', 'Postgres'), ('mysql', 'MySQL')])
     name = StringField('Database Name')
     user = StringField('Username')
     password = PasswordField('Password')
-    host = StringField('Host')
+    host = StringField('Host:Port')
     submit = SubmitField('Submit')

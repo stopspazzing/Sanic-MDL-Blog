@@ -6,16 +6,13 @@ A [Sanic](https://github.com/channelcat/sanic) ([asynchronous](http://stackoverf
 You need several packages first for all pip packages to completely install.
 
 NOTICE:
-```
+
 Working on Windows with Visual C++ v14 installed. Please use instructions here: https://www.scivision.dev/python-windows-visual-c-14-required/
-```
+
 
 So here is a list of packages required:
 ```
 python & python-dev >=3.6
-unixodbc
-unixodbc-dev
-libsqliteodbc
 ```
 
 
@@ -29,6 +26,13 @@ libsqliteodbc
 100% following Sanic's import from config:
 http://sanic.readthedocs.io/en/latest/sanic/config.html#from-a-file
 For Database connection urls, use https://docs.sqlalchemy.org/en/13/core/engines.html#database-urls
+
+Database type names:
+```
+sqlite
+mysql
+postgresql
+```
 
 Example config:
 ```

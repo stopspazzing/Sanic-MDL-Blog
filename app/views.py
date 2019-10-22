@@ -89,7 +89,8 @@ async def setup(request):
     if config['SETUP_DB']:
         dform = DatabaseForm(request)
         if request.method == 'POST' and dform.validate():
-            valid = await sql_validate(dform.user.data, dform.password.data, dform.name.data, dform.host.data, dform.type.data)
+            valid = await sql_validate(dform.user.data, dform.password.data, dform.name.data, dform.host.data,
+                                       dform.type.data)
             if not valid:
                 print('Error - DB Not Valid')
                 return redirect(app.url_for('setup'))
@@ -161,7 +162,8 @@ async def login(request):
     if request.method == 'POST' and lform.validate():
         fuser = lform.username.data
         fpass = lform.password.data
-        fetch = await sql_select(f'SELECT * FROM "blog_settings" WHERE `username`="{fuser}" AND `password`="{fpass}";', 1)
+        fetch = await sql_select(f'SELECT * FROM "blog_settings" WHERE `username`="{fuser}" AND `password`="{fpass}";',
+                                 1)
         if fetch is not None:
             user = User(id=1, name=fuser)
             auth.login_user(request, user)

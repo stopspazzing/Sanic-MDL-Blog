@@ -29,43 +29,29 @@ async def sql_select(query, count):
 
 
 async def sql_connection():
+    dsn = config['DB_URI']
     try:
-        dsn = 'Driver=SQLite3;Database=app.db'
         if not dsn:
-            dsn = 'Driver=SQLite3;Database=app.db'
+            dsn = 'sqlite://'
             config['DB_URI'] = dsn
-        async with dbase(url=dsn) as database:
+        async with dbase(dsn) as database:
             return await database.connect()
     except Exception:
-        print('SQL Connection Failed!')
+        print(f'SQL Connection Failed! Tried {dsn}')
         return False
 
 
 async def sql_validate(user, password, name, host, dbtype):
-    if dbtype == 'lite':
+    if dbtype == 'sqlite':
         if not name:
             db = 'app.db'
         else:
             db = name.join('.db')
-        config['DB_URI'] = f'Driver=SQLite3;Database={db}'
+        config['DB_URI'] = f'sqlite://{db}'
         config['DB_TYPE'] = dbtype
-    # TODO: Add postgre and mysql connection options
-    #     if dbtype == 'postgres':
-    #         if not name:
-    #             db = 'blank'
-    #         else:
-    #             db = 'postgresql://localhost/example'
-    #         config['DB_URI'] = f'Driver=Postgresql;Database={db}'
-    #         config['DB_TYPE'] = dbtype
-    #       if dbtype == 'mysql':
-    #              if not name:
-    #                  db = 'blank'
-    #              else:
-    #                  db = 'mysql://localhost/example'
-    #              config['DB_URI'] = f'Driver=MySQL;Database={db}'
-    #              config['DB_TYPE'] = dbtype
-    #
-    #
+    else:
+        config['DB_URI'] = f'{dbtype}://{user}:{password}@{host}{name}'
+        config['DB_TYPE'] = dbtype
     conn = await sql_connection()
     if conn:
         return True
