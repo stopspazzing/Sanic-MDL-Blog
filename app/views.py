@@ -16,7 +16,7 @@ from sanic_auth import Auth, User
 # local imports
 from app import app
 from app.forms import WelcomeForm, DatabaseForm, LoginForm
-from app.models import sql_demo, sql_connection, sql_validate, sql_select
+from app.models import sql_demo, sql_validate, sql_select, sql_finish
 
 # initialize imports
 Compress(app)
@@ -89,18 +89,21 @@ async def setup(request):
     if config['SETUP_DB']:
         dform = DatabaseForm(request)
         if request.method == 'POST' and dform.validate():
+            print('Setting up DB')
             valid = await sql_validate(dform.user.data, dform.password.data, dform.name.data, dform.host.data,
                                        dform.type.data)
             if not valid:
                 print('Error - DB Not Valid')
                 return redirect(app.url_for('setup'))
             config['SETUP_DB'] = False
+            print('DB Setup Finished')
             return redirect(app.url_for('setup'))
         page['title'] = 'Blog First Start'
         page['header'] = 'Setup Database'
         page['text'] = 'Below you should enter your database connection details.'
         return jrender('page.html', request, page=page, form=dform)
     elif config['SETUP_BLOG']:
+        print('Setting up Blog')
         wform = WelcomeForm(request)
         if request.method == 'POST' and wform.validate():
             user = User(id=1, name=wform.username.data)
@@ -114,14 +117,17 @@ async def setup(request):
                 o.write('DEMO_CONTENT = False\n')
                 o.write('SETUP_DB = False\n')
                 o.write('SETUP_BLOG = False\n')
-            await sql_demo()
-            con = await sql_connection()
-            date = datetime.datetime.now()
-            await con.execute(f'INSERT INTO "blog_settings" (`title`,`created_on`,`username`,`password`,`email`,`hidden'
-                              f'`) VALUES ("{wform.title.data}","{date}","{wform.username.data}","{wform.password.data}'
-                              f'","{wform.email.data}","{wform.seo.data}");')
-            await con.commit()
-            await con.close()
+            print('Wrote config.py')
+            demo = await sql_demo()
+            print('Injected Demo Content')
+            if not demo:
+                print('Demo content broke')
+                return redirect(app.url_for('setup'))
+            print('Finished With Demo Content')
+            finish_up = await sql_finish(wform.title.data,wform.username.data,wform.password.data,wform.email.data,
+                                           wform.seo.data)
+            if not finish_up:
+                return redirect(app.url_for('setup'))
             return redirect('/')
         page['title'] = 'Blog First Start'
         page['header'] = 'Welcome'
@@ -135,20 +141,28 @@ async def setup(request):
 
 
 async def index(request):
-    fetch = await sql_select('SELECT * FROM blog_posts;', 4)
-    if fetch is None:
-        page = dict()
-        page['header'] = 'No Posts Found :('
-        page['text'] = 'Sorry, We couldn\'t find any posts.'
-        return jrender('page.html', request, page=page)
-    return jrender('index.html', request, page=fetch)
+    try:
+        fetch = await sql_select(None, 4)
+        if fetch is None:
+            page = dict()
+            page['header'] = 'No Posts Found :('
+            page['text'] = 'Sorry, We couldn\'t find any posts.'
+            return jrender('page.html', request, page=page)
+        return jrender('index.html', request, page=fetch)
+    except Exception as error:
+        print(f'Index Request Broke! {error}')
+        raise NotFound("404 Error", status_code=404)
 
 
 async def post(request, name):
-    fetch = await sql_select(f'SELECT * FROM blog_posts WHERE post_name="{name}";', 1)
-    if not fetch:
+    try:
+        fetch = await sql_select(f'SELECT * FROM blog_posts WHERE post_name="{name}";', 1)
+        if not fetch:
+            raise NotFound("404 Error", status_code=404)
+        return jrender('post.html', request, post=fetch)
+    except Exception as error:
+        print(f'Post Broke! {error}')
         raise NotFound("404 Error", status_code=404)
-    return jrender('post.html', request, post=fetch)
 
 
 @auth.login_required
@@ -162,7 +176,7 @@ async def login(request):
     if request.method == 'POST' and lform.validate():
         fuser = lform.username.data
         fpass = lform.password.data
-        fetch = await sql_select(f'SELECT * FROM "blog_settings" WHERE `username`="{fuser}" AND `password`="{fpass}";',
+        fetch = await sql_select(f'SELECT * FROM "blog_users" WHERE `username`="{fuser}" AND `password`="{fpass}";',
                                  1)
         if fetch is not None:
             user = User(id=1, name=fuser)

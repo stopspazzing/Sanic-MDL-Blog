@@ -1,4 +1,6 @@
-sanic >= 0.5.1
+aiomysql
+sqlalchemy
+sanic
 Jinja2
 sanic_session
 sanic-jinja2
@@ -6,5 +8,5 @@ sanic_compress
 sanic-useragent
 sanic_auth
 wtforms
-sanic_wtf >= 0.4.0
+sanic_wtf
 Databases
