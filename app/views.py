@@ -16,7 +16,7 @@ from sanic_auth import Auth, User
 # local imports
 from app import app
 from app.forms import WelcomeForm, DatabaseForm, LoginForm
-from app.models import sql_demo, sql_validate, sql_select, sql_finish
+from app.models import sql_master
 
 # initialize imports
 Compress(app)
@@ -90,11 +90,11 @@ async def setup(request):
         dform = DatabaseForm(request)
         if request.method == 'POST' and dform.validate():
             print('Setting up DB')
-            valid = await sql_validate(dform.user.data, dform.password.data, dform.name.data, dform.host.data,
-                                       dform.type.data)
-            if not valid:
-                print('Error - DB Not Valid')
-                return redirect(app.url_for('setup'))
+            data = (dform.user.data, dform.password.data, dform.name.data, dform.host.data, dform.type.data)
+            await sql_master(data)
+            # if not valid:
+            #     print('Error - DB Not Valid')
+            #     return redirect(app.url_for('setup'))
             config['SETUP_DB'] = False
             print('DB Setup Finished')
             return redirect(app.url_for('setup'))
@@ -108,26 +108,26 @@ async def setup(request):
         if request.method == 'POST' and wform.validate():
             user = User(id=1, name=wform.username.data)
             auth.login_user(request, user)
-            config['SETUP_BLOG'] = False
-            uri = config['DB_URI']
-            dbt = config['DB_TYPE']
-            with open("config.py", "wt") as o:
-                o.write(f'DB_URI = {repr(uri)}\n')
-                o.write(f'DB_TYPE = {repr(dbt)}\n')
-                o.write('DEMO_CONTENT = False\n')
-                o.write('SETUP_DB = False\n')
-                o.write('SETUP_BLOG = False\n')
-            print('Wrote config.py')
-            demo = await sql_demo()
-            print('Injected Demo Content')
-            if not demo:
-                print('Demo content broke')
-                return redirect(app.url_for('setup'))
-            print('Finished With Demo Content')
-            finish_up = await sql_finish(wform.title.data,wform.username.data,wform.password.data,wform.email.data,
-                                           wform.seo.data)
+            # uri = config['DB_URI']
+            # dbt = config['DB_TYPE']
+            # with open("config.py", "wt") as o:
+            #     o.write(f'DB_URI = {repr(uri)}\n')
+            #     o.write(f'DB_TYPE = {repr(dbt)}\n')
+            #     o.write('DEMO_CONTENT = False\n')
+            #     o.write('SETUP_DB = False\n')
+            #     o.write('SETUP_BLOG = False\n')
+            # print('Wrote config.py')
+            # demo = await sql_demo()
+            # print('Injected Demo Content')
+            # if not demo:
+            #     print('Demo content broke')
+            #     return redirect(app.url_for('setup'))
+            # print('Finished With Demo Content')
+            data = (wform.title.data, wform.username.data, wform.password.data, wform.email.data)
+            finish_up = await sql_master(data)
             if not finish_up:
                 return redirect(app.url_for('setup'))
+            config['SETUP_BLOG'] = False
             return redirect('/')
         page['title'] = 'Blog First Start'
         page['header'] = 'Welcome'
@@ -141,8 +141,9 @@ async def setup(request):
 
 
 async def index(request):
+    data = (None, 4)
     try:
-        fetch = await sql_select(None, 4)
+        fetch = await sql_master(data)
         if fetch is None:
             page = dict()
             page['header'] = 'No Posts Found :('
@@ -155,8 +156,9 @@ async def index(request):
 
 
 async def post(request, name):
+    data = (f'SELECT * FROM blog_posts WHERE post_name="{name}";', 1)
     try:
-        fetch = await sql_select(f'SELECT * FROM blog_posts WHERE post_name="{name}";', 1)
+        fetch = await sql_master(data)
         if not fetch:
             raise NotFound("404 Error", status_code=404)
         return jrender('post.html', request, post=fetch)
@@ -176,8 +178,8 @@ async def login(request):
     if request.method == 'POST' and lform.validate():
         fuser = lform.username.data
         fpass = lform.password.data
-        fetch = await sql_select(f'SELECT * FROM "blog_users" WHERE `username`="{fuser}" AND `password`="{fpass}";',
-                                 1)
+        data = (f'SELECT * FROM "blog_users" WHERE `username`="{fuser}" AND `password`="{fpass}";', 1)
+        fetch = await sql_master(data)
         if fetch is not None:
             user = User(id=1, name=fuser)
             auth.login_user(request, user)
